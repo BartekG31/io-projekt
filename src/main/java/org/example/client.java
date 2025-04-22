@@ -1,24 +1,104 @@
 package org.example;
 
+import javax.swing.*;
+import javax.swing.border.EmptyBorder;
+import java.awt.*;
+import java.awt.event.ActionEvent;
 import java.io.*;
 import java.net.Socket;
-import java.util.Scanner;
 
-public class client {
-    public static void main(String[] args) {
-        String host = "localhost";
-        int port = 5000;
+public class client extends JFrame {
+    private final JTextField loginField;
+    private final JPasswordField passwordField;
+    private final JLabel statusLabel;
 
-        try (Socket socket = new Socket(host, port)) {
+    public client() {
+        setTitle("Logowanie do systemu");
+        setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+        setSize(440, 320);
+        setResizable(false);
+        setLocationRelativeTo(null);
+
+        JPanel mainPanel = new JPanel();
+        mainPanel.setLayout(new BoxLayout(mainPanel, BoxLayout.Y_AXIS));
+        mainPanel.setBackground(new Color(248, 248, 248));
+        mainPanel.setBorder(new EmptyBorder(30, 30, 20, 30));
+
+        JLabel title = new JLabel("Logowanie do systemu");
+        title.setFont(new Font("SansSerif", Font.BOLD, 20));
+        title.setAlignmentX(Component.CENTER_ALIGNMENT);
+        title.setBorder(new EmptyBorder(0, 0, 20, 0));
+
+        JPanel formPanel = new JPanel(new GridBagLayout());
+        formPanel.setBackground(mainPanel.getBackground());
+        GridBagConstraints gbc = new GridBagConstraints();
+        gbc.insets = new Insets(10, 10, 10, 10);
+        gbc.anchor = GridBagConstraints.WEST;
+
+        gbc.gridx = 0;
+        gbc.gridy = 0;
+        formPanel.add(new JLabel("Login:"), gbc);
+
+        gbc.gridx = 1;
+        loginField = new JTextField(15);
+        stylujPole(loginField);
+        formPanel.add(loginField, gbc);
+
+        gbc.gridx = 0;
+        gbc.gridy = 1;
+        formPanel.add(new JLabel("Hasło:"), gbc);
+
+        gbc.gridx = 1;
+        passwordField = new JPasswordField(15);
+        stylujPole(passwordField);
+        formPanel.add(passwordField, gbc);
+
+        JButton loginButton = new JButton("Zaloguj");
+        loginButton.setBackground(new Color(70, 105, 255));
+        loginButton.setForeground(Color.WHITE);
+        loginButton.setFont(new Font("SansSerif", Font.BOLD, 15));
+        loginButton.setFocusPainted(false);
+        loginButton.setAlignmentX(Component.CENTER_ALIGNMENT);
+        loginButton.setPreferredSize(new Dimension(200, 40));
+        loginButton.addActionListener(this::handleLogin);
+
+        statusLabel = new JLabel(" ", SwingConstants.CENTER);
+        statusLabel.setFont(new Font("SansSerif", Font.PLAIN, 13));
+        statusLabel.setForeground(Color.RED);
+        statusLabel.setBorder(new EmptyBorder(10, 0, 0, 0));
+        statusLabel.setAlignmentX(Component.CENTER_ALIGNMENT);
+
+        mainPanel.add(title);
+        mainPanel.add(formPanel);
+        mainPanel.add(Box.createRigidArea(new Dimension(0, 20)));
+        mainPanel.add(loginButton);
+        mainPanel.add(statusLabel);
+
+        add(mainPanel);
+        setVisible(true);
+    }
+
+    private void stylujPole(JTextField field) {
+        field.setFont(new Font("SansSerif", Font.PLAIN, 14));
+        field.setBorder(BorderFactory.createCompoundBorder(
+                BorderFactory.createLineBorder(new Color(0, 0, 0), 1),
+                BorderFactory.createEmptyBorder(8, 10, 8, 10)
+        ));
+        field.setBackground(Color.WHITE);
+    }
+
+    private void handleLogin(ActionEvent e) {
+        String login = loginField.getText().trim();
+        String haslo = new String(passwordField.getPassword()).trim();
+
+        if (login.isEmpty() || haslo.isEmpty()) {
+            pokazBlad("Wprowadź login i hasło.");
+            return;
+        }
+
+        try (Socket socket = new Socket("localhost", 5000)) {
             PrintWriter out = new PrintWriter(socket.getOutputStream(), true);
             BufferedReader in = new BufferedReader(new InputStreamReader(socket.getInputStream()));
-            Scanner scanner = new Scanner(System.in);
-
-            System.out.println("LOGOWANIE DO SYSTEMU");
-            System.out.print("Login: ");
-            String login = scanner.nextLine();
-            System.out.print("Hasło: ");
-            String haslo = scanner.nextLine();
 
             out.println("LOGIN;" + login + ";" + haslo);
             String response = in.readLine();
@@ -26,14 +106,33 @@ public class client {
             if (response.startsWith("OK")) {
                 String[] parts = response.split(";");
                 String imie = parts[1];
-                String rola = parts[2];
-                System.out.println("Zalogowano jako " + imie + " [" + rola + "]");
+                String nazwisko = parts[2];
+                String rola = parts[3];
+
+                String pelneImieNazwisko = imie + " " + nazwisko;
+                new MainPanel(pelneImieNazwisko, rola);
+                dispose();
+
             } else {
-                System.out.println("Logowanie nieudane: " + response.split(";")[1]);
+                pokazBlad(response.split(";", 2)[1]);
             }
 
-        } catch (IOException e) {
-            System.out.println("Błąd klienta: " + e.getMessage());
+        } catch (IOException ex) {
+            pokazBlad("Błąd połączenia z serwerem.");
         }
+    }
+
+    private void pokazBlad(String tekst) {
+        statusLabel.setText(tekst);
+        statusLabel.setForeground(Color.RED);
+    }
+
+    private void pokazSukces(String tekst) {
+        statusLabel.setText(tekst);
+        statusLabel.setForeground(new Color(0, 128, 0));
+    }
+
+    public static void main(String[] args) {
+        SwingUtilities.invokeLater(client::new);
     }
 }
