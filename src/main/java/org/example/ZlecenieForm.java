@@ -15,8 +15,11 @@ public class ZlecenieForm extends JFrame {
     private final JTextField opisField;
     private final JTextField wagaField;
     private final JTextField dataField;
+    private final int userId;
 
-    public ZlecenieForm() {
+    public ZlecenieForm(int userId) {
+        this.userId = userId;
+
         setTitle("Zleć transport");
         setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
         setSize(450, 650);
@@ -102,6 +105,7 @@ public class ZlecenieForm extends JFrame {
 
             String komunikat = String.join(";",
                     "DODAJ_ZLECENIE",
+                    String.valueOf(userId),
                     odbiorcaField.getText(),
                     adresField.getText(),
                     miastoField.getText(),

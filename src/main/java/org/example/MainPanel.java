@@ -6,7 +6,7 @@ import java.awt.*;
 
 public class MainPanel extends JFrame {
 
-    public MainPanel(String pelneImieNazwisko, String rola) {
+    public MainPanel(int userId, String pelneImieNazwisko, String rola) {
         setTitle("Panel główny - " + rola);
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         setSize(500, 520);
@@ -31,18 +31,18 @@ public class MainPanel extends JFrame {
 
         switch (rola.toUpperCase()) {
             case "KLIENT" -> {
-                buttonPanel.add(button("Zleć transport", () -> new ZlecenieForm()));
+                buttonPanel.add(button("Zleć transport", () -> new ZlecenieForm(userId)));
                 buttonPanel.add(Box.createRigidArea(new Dimension(0, 10)));
 
                 buttonPanel.add(button("Zatwierdź odbiór przesyłki", () -> new OdbiorForm(pelneImieNazwisko)));
                 buttonPanel.add(Box.createRigidArea(new Dimension(0, 10)));
 
-                buttonPanel.add(button("Przeglądaj historię zleceń", () ->
-                        JOptionPane.showMessageDialog(this, "Opcja jeszcze niezaimplementowana")));
+                buttonPanel.add(button("Przeglądaj historię zleceń", () -> new HistoriaZlecenForm(userId)));
+
                 buttonPanel.add(Box.createRigidArea(new Dimension(0, 10)));
 
-                buttonPanel.add(button("Zgłoś problem z przesyłką", () ->
-                        JOptionPane.showMessageDialog(this, "Opcja jeszcze niezaimplementowana")));
+                buttonPanel.add(button("Zgłoś problem z przesyłką", () -> new ProblemForm(userId)));
+
                 buttonPanel.add(Box.createRigidArea(new Dimension(0, 10)));
 
                 buttonPanel.add(button("Zgłoś reklamację", () ->

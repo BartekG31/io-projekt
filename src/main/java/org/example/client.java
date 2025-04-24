@@ -105,14 +105,14 @@ public class client extends JFrame {
 
             if (response.startsWith("OK")) {
                 String[] parts = response.split(";");
-                String imie = parts[1];
-                String nazwisko = parts[2];
-                String rola = parts[3];
+                int id = Integer.parseInt(parts[1]);
+                String imie = parts[2];
+                String nazwisko = parts[3];
+                String rola = parts[4];
 
                 String pelneImieNazwisko = imie + " " + nazwisko;
-                new MainPanel(pelneImieNazwisko, rola);
+                new MainPanel(id, pelneImieNazwisko, rola);
                 dispose();
-
             } else {
                 pokazBlad(response.split(";", 2)[1]);
             }
@@ -125,11 +125,6 @@ public class client extends JFrame {
     private void pokazBlad(String tekst) {
         statusLabel.setText(tekst);
         statusLabel.setForeground(Color.RED);
-    }
-
-    private void pokazSukces(String tekst) {
-        statusLabel.setText(tekst);
-        statusLabel.setForeground(new Color(0, 128, 0));
     }
 
     public static void main(String[] args) {

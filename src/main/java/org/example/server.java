@@ -43,18 +43,38 @@ public class server {
 
                 } else if (command.startsWith("DODAJ_ZLECENIE")) {
                     String[] data = command.split(";");
-                    if (data.length < 8) {
+                    if (data.length < 9) {
                         out.println("ERROR;Brakuje danych zlecenia");
                     } else {
                         out.println(dodajZlecenie(data));
                     }
 
-                } else if (command.startsWith("ZATWIERDZ_ODBIOR")) {
+                } else if (command.startsWith("POBIERZ_DO_ODBIORU")) {
+                    String[] parts = command.split(";");
+                    out.println(pobierzDoOdbioru(parts[1]));
+
+                } else if (command.startsWith("ZATWIERDZ_POJEDYNCZE")) {
+                    String[] parts = command.split(";");
+                    out.println(zmienStatus(parts[1], "Zrealizowane"));
+
+                } else if (command.startsWith("ODRZUC_POJEDYNCZE")) {
+                    String[] parts = command.split(";");
+                    out.println(zmienStatus(parts[1], "Odrzucone"));
+
+                } else if (command.startsWith("HISTORIA_ZLECEN")) {
                     String[] parts = command.split(";");
                     if (parts.length < 2) {
-                        out.println("ERROR;Brakuje nazwiska odbiorcy");
+                        out.println("ERROR;Brakuje ID użytkownika");
                     } else {
-                        out.println(zatwierdzOdbior(parts[1]));
+                        out.println(pobierzHistorie(parts[1]));
+                    }
+
+                } else if (command.startsWith("ZGLOS_PROBLEM")) {
+                    String[] parts = command.split(";", 3);
+                    if (parts.length < 3) {
+                        out.println("ERROR;Brakuje ID zlecenia lub opisu problemu");
+                    } else {
+                        out.println(zglosProblem(parts[1], parts[2]));
                     }
 
                 } else {
@@ -74,7 +94,7 @@ public class server {
             UzytkownikDAO dao = new UzytkownikDAO(conn);
             Uzytkownik u = dao.zaloguj(login, haslo);
             if (u != null) {
-                return "OK;" + u.getImie() + ";" + u.getNazwisko() + ";" + u.getRola();
+                return "OK;" + u.getId() + ";" + u.getImie() + ";" + u.getNazwisko() + ";" + u.getRola();
             } else {
                 return "ERROR;Niepoprawny login lub hasło";
             }
@@ -86,44 +106,111 @@ public class server {
     private static String dodajZlecenie(String[] data) {
         try (Connection conn = getConnection()) {
             PreparedStatement stmt = conn.prepareStatement(
-                    "INSERT INTO ZLECENIA (odbiorca, adres, miasto, kod_pocztowy, opis, waga, data_nadania, status) " +
-                            "VALUES (?, ?, ?, ?, ?, ?, ?, 'Nowe')"
+                    "INSERT INTO ZLECENIA (nadawca_id, odbiorca, adres, miasto, kod_pocztowy, opis, waga, data_nadania, status) " +
+                            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'Nowe')"
             );
-            stmt.setString(1, data[1]);
+            stmt.setInt(1, Integer.parseInt(data[1]));
             stmt.setString(2, data[2]);
             stmt.setString(3, data[3]);
             stmt.setString(4, data[4]);
             stmt.setString(5, data[5]);
-            stmt.setDouble(6, Double.parseDouble(data[6]));
-            stmt.setDate(7, Date.valueOf(data[7]));
-            stmt.executeUpdate();
+            stmt.setString(6, data[6]);
+            stmt.setDouble(7, Double.parseDouble(data[7]));
+            stmt.setDate(8, Date.valueOf(data[8]));
 
+            stmt.executeUpdate();
             return "OK;Zlecenie zostało zapisane";
         } catch (Exception e) {
             return "ERROR;" + e.getMessage();
         }
     }
 
-    private static String zatwierdzOdbior(String odbiorca) {
+    private static String pobierzDoOdbioru(String odbiorca) {
         try (Connection conn = getConnection()) {
             PreparedStatement stmt = conn.prepareStatement(
-                    "UPDATE ZLECENIA SET status = 'Zrealizowane' WHERE odbiorca = ? AND status = 'Nowe'"
+                    "SELECT z.id_zlecenia, z.opis, z.waga, z.data_nadania, u.imie, u.nazwisko " +
+                            "FROM ZLECENIA z " +
+                            "JOIN UZYTKOWNIK u ON z.nadawca_id = u.id " +
+                            "WHERE z.odbiorca = ? AND z.status = 'Nowe'"
             );
             stmt.setString(1, odbiorca);
-            int rows = stmt.executeUpdate();
+            ResultSet rs = stmt.executeQuery();
 
+            StringBuilder response = new StringBuilder("OK");
+            while (rs.next()) {
+                response.append(";")
+                        .append(rs.getInt("id_zlecenia")).append("|")
+                        .append(rs.getString("opis")).append("|")
+                        .append(rs.getDouble("waga")).append("|")
+                        .append(rs.getDate("data_nadania")).append("|")
+                        .append(rs.getString("imie")).append(" ").append(rs.getString("nazwisko"));
+            }
+
+            return response.toString();
+        } catch (Exception e) {
+            return "ERROR;" + e.getMessage();
+        }
+    }
+
+    private static String zmienStatus(String idZlecenia, String nowyStatus) {
+        try (Connection conn = getConnection()) {
+            PreparedStatement stmt = conn.prepareStatement(
+                    "UPDATE ZLECENIA SET status = ? WHERE id_zlecenia = ?"
+            );
+            stmt.setString(1, nowyStatus);
+            stmt.setInt(2, Integer.parseInt(idZlecenia));
+
+            int rows = stmt.executeUpdate();
             if (rows > 0) {
-                return "OK;Zatwierdzono " + rows + " zleceń dla " + odbiorca + ".";
+                return "OK;Zmieniono status na " + nowyStatus;
             } else {
-                return "ERROR;Brak zleceń do odbioru dla podanej osoby.";
+                return "ERROR;Nie znaleziono zlecenia o podanym ID";
             }
         } catch (Exception e) {
             return "ERROR;" + e.getMessage();
         }
     }
 
+    private static String pobierzHistorie(String nadawcaId) {
+        try (Connection conn = getConnection()) {
+            PreparedStatement stmt = conn.prepareStatement(
+                    "SELECT odbiorca, opis, status, data_nadania FROM ZLECENIA WHERE nadawca_id = ? ORDER BY data_nadania DESC"
+            );
+            stmt.setInt(1, Integer.parseInt(nadawcaId));
+            ResultSet rs = stmt.executeQuery();
+
+            StringBuilder sb = new StringBuilder("OK");
+            while (rs.next()) {
+                sb.append(";")
+                        .append(rs.getString("odbiorca")).append("|")
+                        .append(rs.getString("opis")).append("|")
+                        .append(rs.getString("status")).append("|")
+                        .append(rs.getDate("data_nadania"));
+            }
+
+            return sb.toString();
+        } catch (Exception e) {
+            return "ERROR;" + e.getMessage();
+        }
+    }
+
+    private static String zglosProblem(String zlecenieId, String opis) {
+        try (Connection conn = getConnection()) {
+            PreparedStatement stmt = conn.prepareStatement(
+                    "INSERT INTO PROBLEMY (zlecenie_id, opis) VALUES (?, ?)"
+            );
+            stmt.setInt(1, Integer.parseInt(zlecenieId));
+            stmt.setString(2, opis);
+            stmt.executeUpdate();
+
+            return "OK;Zgłoszenie zostało zapisane";
+        } catch (Exception e) {
+            return "ERROR;" + e.getMessage();
+        }
+    }
+
     private static Connection getConnection() throws SQLException {
-        String url = "jdbc:oracle:thin:@xxx.xxx.xxx.xxx:1521";
+        String url = "jdbc:oracle:thin:@192.168.10.40:1522";
         String username = "SYSTEM";
         String password = "iop123";
         return DriverManager.getConnection(url, username, password);
