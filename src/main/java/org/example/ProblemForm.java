@@ -8,13 +8,13 @@ import java.net.Socket;
 import java.util.HashMap;
 
 public class ProblemForm extends JFrame {
-    private final int userId;
+    private final String odbiorca;
     private final JComboBox<String> zleceniaBox;
     private final JTextArea opisField;
     private final HashMap<String, String> zleceniaMap = new HashMap<>();
 
-    public ProblemForm(int userId) {
-        this.userId = userId;
+    public ProblemForm(String odbiorca) {
+        this.odbiorca = odbiorca;
 
         setTitle("Zgłoś problem z przesyłką");
         setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
@@ -27,7 +27,7 @@ public class ProblemForm extends JFrame {
         panel.setBorder(new EmptyBorder(20, 30, 20, 30));
         panel.setBackground(Color.WHITE);
 
-        JLabel label = new JLabel("Wybierz zlecenie:");
+        JLabel label = new JLabel("Wybierz zrealizowane zlecenie:");
         label.setFont(new Font("SansSerif", Font.PLAIN, 14));
         panel.add(label);
 
@@ -70,22 +70,17 @@ public class ProblemForm extends JFrame {
              PrintWriter out = new PrintWriter(socket.getOutputStream(), true);
              BufferedReader in = new BufferedReader(new InputStreamReader(socket.getInputStream()))) {
 
-            out.println("HISTORIA_ZLECEN;" + userId);
+            out.println("POBIERZ_ZREALIZOWANE_DO_PROBLEMU;" + odbiorca);
             String response = in.readLine();
 
             if (response.startsWith("OK")) {
                 String[] parts = response.split(";");
                 for (int i = 1; i < parts.length; i++) {
                     String[] data = parts[i].split("\\|");
-                    String opis = data[1];
-                    String status = data[2];
-
-                    if (status.equalsIgnoreCase("Zrealizowane")) {
-                        String idZlecenia = String.valueOf(i);
-                        String label = "Zlecenie: " + opis + " (" + data[3] + ")";
-                        zleceniaBox.addItem(label);
-                        zleceniaMap.put(label, idZlecenia);
-                    }
+                    String idZlecenia = data[0];
+                    String label = "ID " + data[0] + ": " + data[1] + ", " + data[2] + "kg (" + data[3] + ") od " + data[4];
+                    zleceniaBox.addItem(label);
+                    zleceniaMap.put(label, idZlecenia);
                 }
             }
 
@@ -99,7 +94,7 @@ public class ProblemForm extends JFrame {
         String opis = opisField.getText().trim();
 
         if (selected == null || opis.isEmpty()) {
-            JOptionPane.showMessageDialog(this, "Wybierz zlecenie i wpisz opis problemu!", "Błąd", JOptionPane.ERROR_MESSAGE);
+            JOptionPane.showMessageDialog(this, "Wybierz zlecenie i wpisz opis!", "Błąd", JOptionPane.ERROR_MESSAGE);
             return;
         }
 
@@ -113,7 +108,7 @@ public class ProblemForm extends JFrame {
             String response = in.readLine();
 
             if (response.startsWith("OK")) {
-                JOptionPane.showMessageDialog(this, "Problem zgłoszony pomyślnie!", "Sukces", JOptionPane.INFORMATION_MESSAGE);
+                JOptionPane.showMessageDialog(this, "Problem zgłoszony!", "Sukces", JOptionPane.INFORMATION_MESSAGE);
                 dispose();
             } else {
                 JOptionPane.showMessageDialog(this, response.split(";", 2)[1], "Błąd", JOptionPane.ERROR_MESSAGE);

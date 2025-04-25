@@ -1,15 +1,23 @@
 package org.example;
 
 import javax.swing.*;
-import javax.swing.border.*;
+import javax.swing.border.EmptyBorder;
 import java.awt.*;
 
 public class MainPanel extends JFrame {
 
-    public MainPanel(int userId, String pelneImieNazwisko, String rola) {
+    private final String pelneImieNazwisko;
+    private final String rola;
+    private final int idUzytkownika;
+
+    public MainPanel(String pelneImieNazwisko, String rola, int idUzytkownika) {
+        this.pelneImieNazwisko = pelneImieNazwisko;
+        this.rola = rola;
+        this.idUzytkownika = idUzytkownika;
+
         setTitle("Panel główny - " + rola);
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
-        setSize(500, 520);
+        setSize(500, 550);
         setLocationRelativeTo(null);
         setResizable(false);
 
@@ -29,34 +37,28 @@ public class MainPanel extends JFrame {
         buttonPanel.setBackground(new Color(248, 248, 248));
         buttonPanel.setBorder(new EmptyBorder(10, 0, 10, 0));
 
-        switch (rola.toUpperCase()) {
-            case "KLIENT" -> {
-                buttonPanel.add(button("Zleć transport", () -> new ZlecenieForm(userId)));
-                buttonPanel.add(Box.createRigidArea(new Dimension(0, 10)));
+        if (rola.equalsIgnoreCase("KLIENT")) {
+            buttonPanel.add(makeButton("Zleć transport", () -> new ZlecenieForm(idUzytkownika)));
+            buttonPanel.add(Box.createRigidArea(new Dimension(0, 10)));
 
-                buttonPanel.add(button("Zatwierdź odbiór przesyłki", () -> new OdbiorForm(pelneImieNazwisko)));
-                buttonPanel.add(Box.createRigidArea(new Dimension(0, 10)));
+            buttonPanel.add(makeButton("Zatwierdź odbiór przesyłki", () -> new OdbiorForm(pelneImieNazwisko)));
+            buttonPanel.add(Box.createRigidArea(new Dimension(0, 10)));
 
-                buttonPanel.add(button("Przeglądaj historię zleceń", () -> new HistoriaZlecenForm(userId)));
+            buttonPanel.add(makeButton("Przeglądaj historię zleceń", () -> new HistoriaZlecenForm(idUzytkownika)));
+            buttonPanel.add(Box.createRigidArea(new Dimension(0, 10)));
 
-                buttonPanel.add(Box.createRigidArea(new Dimension(0, 10)));
+            buttonPanel.add(makeButton("Zgłoś problem z przesyłką", () -> new ProblemForm(pelneImieNazwisko)));
+            buttonPanel.add(Box.createRigidArea(new Dimension(0, 10)));
 
-                buttonPanel.add(button("Zgłoś problem z przesyłką", () -> new ProblemForm(userId)));
+            buttonPanel.add(makeButton("Zgłoś reklamację", () -> new ReklamacjaForm(pelneImieNazwisko)));
+            buttonPanel.add(Box.createRigidArea(new Dimension(0, 10)));
 
-                buttonPanel.add(Box.createRigidArea(new Dimension(0, 10)));
-
-                buttonPanel.add(button("Zgłoś reklamację", () ->
-                        JOptionPane.showMessageDialog(this, "Opcja jeszcze niezaimplementowana")));
-                buttonPanel.add(Box.createRigidArea(new Dimension(0, 10)));
-
-                buttonPanel.add(button("Zaktualizuj dane kontaktowe", () ->
-                        JOptionPane.showMessageDialog(this, "Opcja jeszcze niezaimplementowana")));
-            }
-            default -> {
-                JLabel label = new JLabel("Brak dostępnych funkcji dla tej roli.", JLabel.CENTER);
-                label.setFont(new Font("SansSerif", Font.PLAIN, 14));
-                buttonPanel.add(label);
-            }
+            buttonPanel.add(makeButton("Zaktualizuj dane kontaktowe", () ->
+                    JOptionPane.showMessageDialog(this, "Opcja jeszcze niezaimplementowana")));
+        } else {
+            JLabel label = new JLabel("Brak dostępnych funkcji dla tej roli.", JLabel.CENTER);
+            label.setFont(new Font("SansSerif", Font.PLAIN, 14));
+            buttonPanel.add(label);
         }
 
         mainPanel.add(buttonPanel);
@@ -64,7 +66,7 @@ public class MainPanel extends JFrame {
         setVisible(true);
     }
 
-    private JPanel button(String text, Runnable action) {
+    private JPanel makeButton(String text, Runnable action) {
         JButton button = new JButton(text);
         button.setFont(new Font("SansSerif", Font.PLAIN, 14));
         button.setBackground(new Color(70, 105, 255));

@@ -77,6 +77,18 @@ public class server {
                         out.println(zglosProblem(parts[1], parts[2]));
                     }
 
+                } else if (command.startsWith("ZLECENIA_DO_REKLAMACJI")) {
+                    String[] parts = command.split(";");
+                    out.println(pobierzZleceniaDoReklamacji(parts[1]));
+
+                } else if (command.startsWith("ZGLOS_REKLAMACJE")) {
+                    String[] parts = command.split(";", 4);
+                    if (parts.length < 4) {
+                        out.println("ERROR;Brakuje danych reklamacji");
+                    } else {
+                        out.println(zglosReklamacje(parts[1], parts[2]));
+                    }
+
                 } else {
                     out.println("ERROR;Nieznana komenda");
                 }
@@ -146,7 +158,7 @@ public class server {
                         .append(rs.getString("imie")).append(" ").append(rs.getString("nazwisko"));
             }
 
-            return response.toString();
+            return response.length() == 2 ? "ERROR;Brak zleceń" : response.toString();
         } catch (Exception e) {
             return "ERROR;" + e.getMessage();
         }
@@ -197,7 +209,7 @@ public class server {
     private static String zglosProblem(String zlecenieId, String opis) {
         try (Connection conn = getConnection()) {
             PreparedStatement stmt = conn.prepareStatement(
-                    "INSERT INTO PROBLEMY (zlecenie_id, opis) VALUES (?, ?)"
+                    "INSERT INTO PROBLEMY (ID_ZLECENIA, OPIS_PROBLEMU) VALUES (?, ?)"
             );
             stmt.setInt(1, Integer.parseInt(zlecenieId));
             stmt.setString(2, opis);
@@ -209,8 +221,47 @@ public class server {
         }
     }
 
+    private static String pobierzZleceniaDoReklamacji(String odbiorca) {
+        try (Connection conn = getConnection()) {
+            PreparedStatement stmt = conn.prepareStatement(
+                    "SELECT id_zlecenia, opis FROM ZLECENIA " +
+                            "WHERE odbiorca = ? AND status = 'Zrealizowane' " +
+                            "AND id_zlecenia NOT IN (SELECT id_zlecenia FROM REKLAMACJE)"
+            );
+            stmt.setString(1, odbiorca);
+            ResultSet rs = stmt.executeQuery();
+
+            StringBuilder response = new StringBuilder("OK");
+            while (rs.next()) {
+                response.append(";")
+                        .append(rs.getInt("id_zlecenia")).append("|")
+                        .append(rs.getString("opis"));
+            }
+
+            return response.length() == 2 ? "ERROR;Brak dostępnych zleceń" : response.toString();
+        } catch (Exception e) {
+            return "ERROR;" + e.getMessage();
+        }
+    }
+
+    private static String zglosReklamacje(String zlecenieId, String opisReklamacji) {
+        try (Connection conn = getConnection()) {
+            PreparedStatement stmt = conn.prepareStatement(
+                    "INSERT INTO REKLAMACJE (ID_ZLECENIA, OPIS_REKLAMACJI) VALUES (?, ?)"
+            );
+            stmt.setInt(1, Integer.parseInt(zlecenieId));
+            stmt.setString(2, opisReklamacji);
+            stmt.executeUpdate();
+
+            return "OK;Reklamacja została zgłoszona";
+        } catch (Exception e) {
+            return "ERROR;" + e.getMessage();
+        }
+    }
+
+
     private static Connection getConnection() throws SQLException {
-        String url = "jdbc:oracle:thin:@192.168.10.40:1522";
+        String url = "jdbc:oracle:thin:@xxx.xxx.xxx.xxx:1521";
         String username = "SYSTEM";
         String password = "iop123";
         return DriverManager.getConnection(url, username, password);

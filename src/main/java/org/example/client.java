@@ -81,7 +81,7 @@ public class client extends JFrame {
     private void stylujPole(JTextField field) {
         field.setFont(new Font("SansSerif", Font.PLAIN, 14));
         field.setBorder(BorderFactory.createCompoundBorder(
-                BorderFactory.createLineBorder(new Color(0, 0, 0), 1),
+                BorderFactory.createLineBorder(Color.GRAY),
                 BorderFactory.createEmptyBorder(8, 10, 8, 10)
         ));
         field.setBackground(Color.WHITE);
@@ -111,7 +111,7 @@ public class client extends JFrame {
                 String rola = parts[4];
 
                 String pelneImieNazwisko = imie + " " + nazwisko;
-                new MainPanel(id, pelneImieNazwisko, rola);
+                new MainPanel(pelneImieNazwisko, rola, id);
                 dispose();
             } else {
                 pokazBlad(response.split(";", 2)[1]);
