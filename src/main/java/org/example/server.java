@@ -18,14 +18,10 @@ public class server {
 
             while (true) {
                 Socket clientSocket = serverSocket.accept();
-                System.out.println("Połączono z klientem: " + clientSocket.getInetAddress());
-
                 BufferedReader in = new BufferedReader(new InputStreamReader(clientSocket.getInputStream()));
                 PrintWriter out = new PrintWriter(clientSocket.getOutputStream(), true);
 
                 String command = in.readLine();
-                System.out.println("Odebrano komendę: " + command);
-
                 if (command == null) {
                     out.println("ERROR;Brak komendy");
                     continue;
@@ -33,65 +29,51 @@ public class server {
 
                 if (command.startsWith("LOGIN")) {
                     String[] parts = command.split(";");
-                    if (parts.length < 3) {
-                        out.println("ERROR;Niepoprawny format logowania");
-                    } else {
-                        String login = parts[1];
-                        String haslo = parts[2];
-                        out.println(handleLogin(login, haslo));
-                    }
+                    out.println(handleLogin(parts[1], parts[2]));
 
                 } else if (command.startsWith("DODAJ_ZLECENIE")) {
-                    String[] data = command.split(";");
-                    if (data.length < 9) {
-                        out.println("ERROR;Brakuje danych zlecenia");
-                    } else {
-                        out.println(dodajZlecenie(data));
-                    }
+                    out.println(dodajZlecenie(command.split(";")));
 
                 } else if (command.startsWith("POBIERZ_DO_ODBIORU")) {
-                    String[] parts = command.split(";");
-                    out.println(pobierzDoOdbioru(parts[1]));
+                    out.println(pobierzDoOdbioru(command.split(";")[1]));
 
                 } else if (command.startsWith("ZATWIERDZ_POJEDYNCZE")) {
-                    String[] parts = command.split(";");
-                    out.println(zmienStatus(parts[1], "Zrealizowane"));
+                    out.println(zmienStatus(command.split(";")[1], "Zrealizowane"));
 
                 } else if (command.startsWith("ODRZUC_POJEDYNCZE")) {
-                    String[] parts = command.split(";");
-                    out.println(zmienStatus(parts[1], "Odrzucone"));
+                    out.println(zmienStatus(command.split(";")[1], "Odrzucone"));
 
                 } else if (command.startsWith("HISTORIA_ZLECEN")) {
-                    String[] parts = command.split(";");
-                    if (parts.length < 2) {
-                        out.println("ERROR;Brakuje ID użytkownika");
-                    } else {
-                        out.println(pobierzHistorie(parts[1]));
-                    }
+                    out.println(pobierzHistorie(command.split(";")[1]));
 
                 } else if (command.startsWith("ZGLOS_PROBLEM")) {
                     String[] parts = command.split(";", 3);
-                    if (parts.length < 3) {
-                        out.println("ERROR;Brakuje ID zlecenia lub opisu problemu");
-                    } else {
-                        out.println(zglosProblem(parts[1], parts[2]));
-                    }
+                    out.println(zglosProblem(parts[1], parts[2]));
+
+                } else if (command.startsWith("POBIERZ_ZREALIZOWANE_DO_PROBLEMU")) {
+                    out.println(pobierzZrealizowaneDoProblemu(command.split(";")[1]));
 
                 } else if (command.startsWith("ZLECENIA_DO_REKLAMACJI")) {
-                    String[] parts = command.split(";");
-                    out.println(pobierzZleceniaDoReklamacji(parts[1]));
+                    out.println(pobierzZleceniaDoReklamacji(command.split(";")[1]));
 
                 } else if (command.startsWith("ZGLOS_REKLAMACJE")) {
                     String[] parts = command.split(";", 4);
-                    if (parts.length < 4) {
-                        out.println("ERROR;Brakuje danych reklamacji");
-                    } else {
-                        out.println(zglosReklamacje(parts[1], parts[2]));
-                    }
+                    out.println(zglosReklamacje(parts[1], parts[3]));
 
-                } else {
+                } else if (command.startsWith("AKTUALIZUJ_DANE")) {
+                    out.println(aktualizujDane(command.split(";", 6)));
+
+                } else if (command.startsWith("POBIERZ_UZYTKOWNIKA")) {
+                    out.println(pobierzUzytkownika(command.split(";")[1]));
+
+                } else if (command.startsWith("POBIERZ_PACZKI_NOWE")) {
+                    out.println(pobierzNowePaczki());
+                } else if (command.startsWith("OZNACZ_GOTOWE")) {
+                    out.println(zmienStatus(command.split(";")[1], "Gotowe do wysyłki"));
+                } else  {
                     out.println("ERROR;Nieznana komenda");
                 }
+
 
                 clientSocket.close();
             }
@@ -105,11 +87,9 @@ public class server {
         try (Connection conn = getConnection()) {
             UzytkownikDAO dao = new UzytkownikDAO(conn);
             Uzytkownik u = dao.zaloguj(login, haslo);
-            if (u != null) {
-                return "OK;" + u.getId() + ";" + u.getImie() + ";" + u.getNazwisko() + ";" + u.getRola();
-            } else {
-                return "ERROR;Niepoprawny login lub hasło";
-            }
+            return u != null
+                    ? "OK;" + u.getId() + ";" + u.getImie() + ";" + u.getNazwisko() + ";" + u.getRola()
+                    : "ERROR;Niepoprawny login lub hasło";
         } catch (SQLException e) {
             return "ERROR;" + e.getMessage();
         }
@@ -129,7 +109,6 @@ public class server {
             stmt.setString(6, data[6]);
             stmt.setDouble(7, Double.parseDouble(data[7]));
             stmt.setDate(8, Date.valueOf(data[8]));
-
             stmt.executeUpdate();
             return "OK;Zlecenie zostało zapisane";
         } catch (Exception e) {
@@ -141,43 +120,54 @@ public class server {
         try (Connection conn = getConnection()) {
             PreparedStatement stmt = conn.prepareStatement(
                     "SELECT z.id_zlecenia, z.opis, z.waga, z.data_nadania, u.imie, u.nazwisko " +
-                            "FROM ZLECENIA z " +
-                            "JOIN UZYTKOWNIK u ON z.nadawca_id = u.id " +
-                            "WHERE z.odbiorca = ? AND z.status = 'Nowe'"
+                            "FROM ZLECENIA z JOIN UZYTKOWNIK u ON z.nadawca_id = u.id " +
+                            "WHERE z.odbiorca = ? AND z.status = 'Gotowe do wysyłki'"
             );
             stmt.setString(1, odbiorca);
             ResultSet rs = stmt.executeQuery();
-
             StringBuilder response = new StringBuilder("OK");
             while (rs.next()) {
-                response.append(";")
-                        .append(rs.getInt("id_zlecenia")).append("|")
+                response.append(";").append(rs.getInt("id_zlecenia")).append("|")
                         .append(rs.getString("opis")).append("|")
                         .append(rs.getDouble("waga")).append("|")
                         .append(rs.getDate("data_nadania")).append("|")
                         .append(rs.getString("imie")).append(" ").append(rs.getString("nazwisko"));
             }
-
             return response.length() == 2 ? "ERROR;Brak zleceń" : response.toString();
         } catch (Exception e) {
             return "ERROR;" + e.getMessage();
         }
     }
 
-    private static String zmienStatus(String idZlecenia, String nowyStatus) {
+    private static String pobierzNowePaczki() {
         try (Connection conn = getConnection()) {
             PreparedStatement stmt = conn.prepareStatement(
-                    "UPDATE ZLECENIA SET status = ? WHERE id_zlecenia = ?"
+                    "SELECT id_zlecenia, odbiorca, opis, waga, data_nadania FROM ZLECENIA WHERE status = 'Nowe'"
             );
+            ResultSet rs = stmt.executeQuery();
+            StringBuilder sb = new StringBuilder("OK");
+            while (rs.next()) {
+                sb.append(";").append(rs.getInt("id_zlecenia")).append("|")
+                        .append(rs.getString("odbiorca")).append("|")
+                        .append(rs.getString("opis")).append("|")
+                        .append(rs.getDouble("waga")).append("|")
+                        .append(rs.getDate("data_nadania"));
+            }
+            return sb.length() == 2 ? "ERROR;Brak paczek do przygotowania" : sb.toString();
+        } catch (Exception e) {
+            return "ERROR;" + e.getMessage();
+        }
+    }
+
+
+    private static String zmienStatus(String idZlecenia, String nowyStatus) {
+        try (Connection conn = getConnection()) {
+            PreparedStatement stmt = conn.prepareStatement("UPDATE ZLECENIA SET status = ? WHERE id_zlecenia = ?");
             stmt.setString(1, nowyStatus);
             stmt.setInt(2, Integer.parseInt(idZlecenia));
-
-            int rows = stmt.executeUpdate();
-            if (rows > 0) {
-                return "OK;Zmieniono status na " + nowyStatus;
-            } else {
-                return "ERROR;Nie znaleziono zlecenia o podanym ID";
-            }
+            return stmt.executeUpdate() > 0
+                    ? "OK;Zmieniono status na " + nowyStatus
+                    : "ERROR;Nie znaleziono zlecenia";
         } catch (Exception e) {
             return "ERROR;" + e.getMessage();
         }
@@ -190,16 +180,13 @@ public class server {
             );
             stmt.setInt(1, Integer.parseInt(nadawcaId));
             ResultSet rs = stmt.executeQuery();
-
             StringBuilder sb = new StringBuilder("OK");
             while (rs.next()) {
-                sb.append(";")
-                        .append(rs.getString("odbiorca")).append("|")
+                sb.append(";").append(rs.getString("odbiorca")).append("|")
                         .append(rs.getString("opis")).append("|")
                         .append(rs.getString("status")).append("|")
                         .append(rs.getDate("data_nadania"));
             }
-
             return sb.toString();
         } catch (Exception e) {
             return "ERROR;" + e.getMessage();
@@ -214,8 +201,31 @@ public class server {
             stmt.setInt(1, Integer.parseInt(zlecenieId));
             stmt.setString(2, opis);
             stmt.executeUpdate();
-
             return "OK;Zgłoszenie zostało zapisane";
+        } catch (Exception e) {
+            return "ERROR;" + e.getMessage();
+        }
+    }
+
+    private static String pobierzZrealizowaneDoProblemu(String odbiorca) {
+        try (Connection conn = getConnection()) {
+            PreparedStatement stmt = conn.prepareStatement(
+                    "SELECT z.id_zlecenia, z.opis, z.waga, z.data_nadania, u.imie || ' ' || u.nazwisko AS nadawca " +
+                            "FROM ZLECENIA z JOIN UZYTKOWNIK u ON z.nadawca_id = u.id " +
+                            "WHERE z.odbiorca = ? AND z.status = 'Zrealizowane' " +
+                            "AND z.id_zlecenia NOT IN (SELECT id_zlecenia FROM PROBLEMY)"
+            );
+            stmt.setString(1, odbiorca);
+            ResultSet rs = stmt.executeQuery();
+            StringBuilder sb = new StringBuilder("OK");
+            while (rs.next()) {
+                sb.append(";").append(rs.getInt("id_zlecenia")).append("|")
+                        .append(rs.getString("opis")).append("|")
+                        .append(rs.getDouble("waga")).append("|")
+                        .append(rs.getDate("data_nadania")).append("|")
+                        .append(rs.getString("nadawca"));
+            }
+            return sb.length() == 2 ? "ERROR;Brak przesyłek do zgłoszenia problemu" : sb.toString();
         } catch (Exception e) {
             return "ERROR;" + e.getMessage();
         }
@@ -224,20 +234,18 @@ public class server {
     private static String pobierzZleceniaDoReklamacji(String odbiorca) {
         try (Connection conn = getConnection()) {
             PreparedStatement stmt = conn.prepareStatement(
-                    "SELECT id_zlecenia, opis FROM ZLECENIA " +
-                            "WHERE odbiorca = ? AND status = 'Zrealizowane' " +
-                            "AND id_zlecenia NOT IN (SELECT id_zlecenia FROM REKLAMACJE)"
+                    "SELECT z.id_zlecenia, z.opis FROM ZLECENIA z " +
+                            "WHERE z.odbiorca = ? AND z.status = 'Zrealizowane' " +
+                            "AND z.id_zlecenia IN (SELECT id_zlecenia FROM PROBLEMY) " +
+                            "AND z.id_zlecenia NOT IN (SELECT id_zlecenia FROM REKLAMACJE)"
             );
             stmt.setString(1, odbiorca);
             ResultSet rs = stmt.executeQuery();
-
             StringBuilder response = new StringBuilder("OK");
             while (rs.next()) {
-                response.append(";")
-                        .append(rs.getInt("id_zlecenia")).append("|")
+                response.append(";").append(rs.getInt("id_zlecenia")).append("|")
                         .append(rs.getString("opis"));
             }
-
             return response.length() == 2 ? "ERROR;Brak dostępnych zleceń" : response.toString();
         } catch (Exception e) {
             return "ERROR;" + e.getMessage();
@@ -252,16 +260,51 @@ public class server {
             stmt.setInt(1, Integer.parseInt(zlecenieId));
             stmt.setString(2, opisReklamacji);
             stmt.executeUpdate();
-
             return "OK;Reklamacja została zgłoszona";
         } catch (Exception e) {
             return "ERROR;" + e.getMessage();
         }
     }
 
+    private static String aktualizujDane(String[] parts) {
+        try (Connection conn = getConnection()) {
+            PreparedStatement stmt = conn.prepareStatement(
+                    "UPDATE UZYTKOWNIK SET imie = ?, nazwisko = ?, login = ?, haslo = ? WHERE id = ?"
+            );
+            stmt.setString(1, parts[2]);
+            stmt.setString(2, parts[3]);
+            stmt.setString(3, parts[4]);
+            stmt.setString(4, parts[5]);
+            stmt.setInt(5, Integer.parseInt(parts[1]));
+            int rows = stmt.executeUpdate();
+            return rows > 0 ? "OK;Dane zaktualizowane" : "ERROR;Nie znaleziono użytkownika";
+        } catch (SQLIntegrityConstraintViolationException e) {
+            return "ERROR;Ten login jest już zajęty.";
+        } catch (Exception e) {
+            return "ERROR;" + e.getMessage();
+        }
+    }
+
+    private static String pobierzUzytkownika(String id) {
+        try (Connection conn = getConnection()) {
+            PreparedStatement stmt = conn.prepareStatement(
+                    "SELECT imie, nazwisko, login, haslo FROM UZYTKOWNIK WHERE id = ?"
+            );
+            stmt.setInt(1, Integer.parseInt(id));
+            ResultSet rs = stmt.executeQuery();
+            if (rs.next()) {
+                return "OK;" + rs.getString("imie") + ";" + rs.getString("nazwisko") + ";" +
+                        rs.getString("login") + ";" + rs.getString("haslo");
+            } else {
+                return "ERROR;Nie znaleziono użytkownika";
+            }
+        } catch (Exception e) {
+            return "ERROR;" + e.getMessage();
+        }
+    }
 
     private static Connection getConnection() throws SQLException {
-        String url = "jdbc:oracle:thin:@xxx.xxx.xxx.xxx:1521";
+        String url = "jdbc:oracle:thin:@192.168.0.17:1521";
         String username = "SYSTEM";
         String password = "iop123";
         return DriverManager.getConnection(url, username, password);

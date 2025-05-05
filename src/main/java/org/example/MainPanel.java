@@ -54,7 +54,12 @@ public class MainPanel extends JFrame {
             buttonPanel.add(Box.createRigidArea(new Dimension(0, 10)));
 
             buttonPanel.add(makeButton("Zaktualizuj dane kontaktowe", () ->
-                    JOptionPane.showMessageDialog(this, "Opcja jeszcze niezaimplementowana")));
+                    new AktualizacjaDanychForm(idUzytkownika)));
+
+        }  else if (rola.equalsIgnoreCase("MAGAZYNIER")) {
+            new MagazynierForm(pelneImieNazwisko, "");
+            dispose();
+            return;
         } else {
             JLabel label = new JLabel("Brak dostępnych funkcji dla tej roli.", JLabel.CENTER);
             label.setFont(new Font("SansSerif", Font.PLAIN, 14));
