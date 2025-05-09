@@ -68,12 +68,22 @@ public class server {
 
                 } else if (command.startsWith("POBIERZ_PACZKI_NOWE")) {
                     out.println(pobierzNowePaczki());
+
                 } else if (command.startsWith("OZNACZ_GOTOWE")) {
                     out.println(zmienStatus(command.split(";")[1], "Gotowe do wysyłki"));
-                } else  {
+
+                } else if (command.startsWith("POBIERZ_DO_PRZYJECIA")) {
+                    out.println(pobierzDoPrzyjecia());
+
+                } else if (command.startsWith("PRZYJMIJ_ZLECENIE")) {
+                    out.println(zmienStatus(command.split(";")[1], "Przyjęte"));
+
+                }else if (command.startsWith("POBIERZ_INWENTARYZACJE")) {
+                    out.println(pobierzInwentaryzacje());
+
+                } else {
                     out.println("ERROR;Nieznana komenda");
                 }
-
 
                 clientSocket.close();
             }
@@ -116,6 +126,53 @@ public class server {
         }
     }
 
+    private static String pobierzDoPrzyjecia() {
+        try (Connection conn = getConnection()) {
+            PreparedStatement stmt = conn.prepareStatement(
+                    "SELECT z.id_zlecenia, u.imie || ' ' || u.nazwisko AS nadawca, z.odbiorca, z.opis, z.waga, z.data_nadania " +
+                            "FROM ZLECENIA z JOIN UZYTKOWNIK u ON z.nadawca_id = u.id " +
+                            "WHERE z.status = 'Nowe'"
+            );
+            ResultSet rs = stmt.executeQuery();
+            StringBuilder sb = new StringBuilder("OK");
+
+            while (rs.next()) {
+                sb.append(";")
+                        .append(rs.getInt("id_zlecenia")).append("|")
+                        .append(rs.getString("nadawca")).append("|")
+                        .append(rs.getString("odbiorca")).append("|")
+                        .append(rs.getString("opis")).append("|")
+                        .append(rs.getDouble("waga")).append("|")
+                        .append(rs.getDate("data_nadania"));
+            }
+
+            return sb.length() == 2 ? "ERROR;Brak zleceń do przyjęcia" : sb.toString();
+        } catch (Exception e) {
+            return "ERROR;" + e.getMessage();
+        }
+    }
+
+    private static String pobierzInwentaryzacje() {
+        try (Connection conn = getConnection()) {
+            PreparedStatement stmt = conn.prepareStatement(
+                    "SELECT id_zlecenia, odbiorca, opis, waga, data_nadania FROM ZLECENIA WHERE status = 'Przyjęte'"
+            );
+            ResultSet rs = stmt.executeQuery();
+            StringBuilder sb = new StringBuilder("OK");
+            while (rs.next()) {
+                sb.append(";").append(rs.getInt("id_zlecenia")).append("|")
+                        .append(rs.getString("odbiorca")).append("|")
+                        .append(rs.getString("opis")).append("|")
+                        .append(rs.getDouble("waga")).append("|")
+                        .append(rs.getDate("data_nadania"));
+            }
+            return sb.length() == 2 ? "ERROR;Brak przyjętych paczek" : sb.toString();
+        } catch (Exception e) {
+            return "ERROR;" + e.getMessage();
+        }
+    }
+
+
     private static String pobierzDoOdbioru(String odbiorca) {
         try (Connection conn = getConnection()) {
             PreparedStatement stmt = conn.prepareStatement(
@@ -142,7 +199,7 @@ public class server {
     private static String pobierzNowePaczki() {
         try (Connection conn = getConnection()) {
             PreparedStatement stmt = conn.prepareStatement(
-                    "SELECT id_zlecenia, odbiorca, opis, waga, data_nadania FROM ZLECENIA WHERE status = 'Nowe'"
+                    "SELECT id_zlecenia, odbiorca, opis, waga, data_nadania FROM ZLECENIA WHERE status = 'Przyjęte'"
             );
             ResultSet rs = stmt.executeQuery();
             StringBuilder sb = new StringBuilder("OK");
@@ -304,7 +361,7 @@ public class server {
     }
 
     private static Connection getConnection() throws SQLException {
-        String url = "jdbc:oracle:thin:@192.168.0.17:1521";
+        String url = "jdbc:oracle:thin:@192.168.10.40:1522";
         String username = "SYSTEM";
         String password = "iop123";
         return DriverManager.getConnection(url, username, password);

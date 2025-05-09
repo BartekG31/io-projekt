@@ -25,18 +25,15 @@ public class MagazynierForm extends JFrame {
         title.setBorder(new EmptyBorder(0, 0, 20, 0));
         panel.add(title);
 
+        panel.add(makeStyledButton("Przyjęcie towaru", e -> new PrzyjecieTowaruForm()));
+        panel.add(makeStyledButton("Inwentaryzacja", e -> new InwentaryzacjaForm()));
+
         panel.add(makeStyledButton("Przygotuj paczki do wysyłki", e -> new PrzygotujPaczkiForm()));
-        panel.add(makeStyledButton("Przyjęcie towaru", e -> {
-            // TODO
-        }));
-        panel.add(makeStyledButton("Inwentaryzacja", e -> {
-            // TODO
-        }));
         panel.add(makeStyledButton("Kontrola jakości towaru", e -> {
-            // TODO
+            // TODO: W przyszłości
         }));
         panel.add(makeStyledButton("Zgłoś brak towaru", e -> {
-            // TODO
+            // TODO: W przyszłości
         }));
 
         add(panel);
