@@ -81,6 +81,12 @@ public class server {
                 }else if (command.startsWith("POBIERZ_INWENTARYZACJE")) {
                     out.println(pobierzInwentaryzacje());
 
+
+                } else if (command.startsWith("POBIERZ_GOTOWE_DLA_KURIERA")) {
+                    out.println(pobierzGotoweDlaKuriera());
+
+                } else if (command.startsWith("ODEBRANA_PRZEZ_KURIERA")) {
+                    out.println(zmienStatus(command.split(";")[1], "W drodze"));
                 } else {
                     out.println("ERROR;Nieznana komenda");
                 }
@@ -178,7 +184,7 @@ public class server {
             PreparedStatement stmt = conn.prepareStatement(
                     "SELECT z.id_zlecenia, z.opis, z.waga, z.data_nadania, u.imie, u.nazwisko " +
                             "FROM ZLECENIA z JOIN UZYTKOWNIK u ON z.nadawca_id = u.id " +
-                            "WHERE z.odbiorca = ? AND z.status = 'Gotowe do wysyłki'"
+                            "WHERE z.odbiorca = ? AND z.status = 'Oczekuje na odbiór'"
             );
             stmt.setString(1, odbiorca);
             ResultSet rs = stmt.executeQuery();
@@ -360,8 +366,30 @@ public class server {
         }
     }
 
+
+    private static String pobierzGotoweDlaKuriera() {
+        try (Connection conn = getConnection()) {
+            PreparedStatement stmt = conn.prepareStatement(
+                    "SELECT id_zlecenia, odbiorca, opis, waga, data_nadania FROM ZLECENIA WHERE status = 'Gotowe do wysyłki'"
+            );
+            ResultSet rs = stmt.executeQuery();
+            StringBuilder sb = new StringBuilder("OK");
+            while (rs.next()) {
+                sb.append(";")
+                        .append(rs.getInt("id_zlecenia")).append("|")
+                        .append(rs.getString("odbiorca")).append("|")
+                        .append(rs.getString("opis")).append("|")
+                        .append(rs.getDouble("waga")).append("|")
+                        .append(rs.getDate("data_nadania"));
+            }
+            return sb.length() == 2 ? "ERROR;Brak paczek gotowych do odbioru" : sb.toString();
+        } catch (Exception e) {
+            return "ERROR;" + e.getMessage();
+        }
+    }
+
     private static Connection getConnection() throws SQLException {
-        String url = "jdbc:oracle:thin:@192.168.10.40:1522";
+        String url = "jdbc:oracle:thin:@192.168.0.17:1521";
         String username = "SYSTEM";
         String password = "iop123";
         return DriverManager.getConnection(url, username, password);

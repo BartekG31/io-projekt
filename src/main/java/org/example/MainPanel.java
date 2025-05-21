@@ -60,6 +60,13 @@ public class MainPanel extends JFrame {
             new MagazynierForm(pelneImieNazwisko, "");
             dispose();
             return;
+        } else if (rola.equalsIgnoreCase("KURIER")) {
+            String[] dane = pelneImieNazwisko.trim().split(" ", 2);
+            String imie = dane.length > 0 ? dane[0] : "";
+            String nazwisko = dane.length > 1 ? dane[1] : "";
+            new KurierForm(imie, nazwisko);
+            dispose();
+            return;
         } else {
             JLabel label = new JLabel("Brak dostępnych funkcji dla tej roli.", JLabel.CENTER);
             label.setFont(new Font("SansSerif", Font.PLAIN, 14));
