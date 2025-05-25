@@ -16,10 +16,18 @@ public class MainPanel extends JFrame {
         this.idUzytkownika = idUzytkownika;
 
         setTitle("Panel główny - " + rola);
-        setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
-        setSize(500, 550);
+        setDefaultCloseOperation(JFrame.DO_NOTHING_ON_CLOSE);
+        setSize(500, 600);
         setLocationRelativeTo(null);
         setResizable(false);
+
+        // Obsługa zamykania okna
+        addWindowListener(new java.awt.event.WindowAdapter() {
+            @Override
+            public void windowClosing(java.awt.event.WindowEvent windowEvent) {
+                wyloguj();
+            }
+        });
 
         JPanel mainPanel = new JPanel();
         mainPanel.setBackground(new Color(248, 248, 248));
@@ -74,6 +82,26 @@ public class MainPanel extends JFrame {
         }
 
         mainPanel.add(buttonPanel);
+
+        // Separator i przycisk wyloguj
+        mainPanel.add(Box.createRigidArea(new Dimension(0, 30)));
+        JSeparator separator = new JSeparator();
+        separator.setMaximumSize(new Dimension(Integer.MAX_VALUE, 1));
+        separator.setBackground(Color.GRAY);
+        mainPanel.add(separator);
+        mainPanel.add(Box.createRigidArea(new Dimension(0, 15)));
+
+        JButton wylogujButton = new JButton("🚪 Wyloguj");
+        wylogujButton.setFont(new Font("SansSerif", Font.BOLD, 14));
+        wylogujButton.setBackground(new Color(220, 53, 69));
+        wylogujButton.setForeground(Color.WHITE);
+        wylogujButton.setFocusPainted(false);
+        wylogujButton.setMaximumSize(new Dimension(200, 40));
+        wylogujButton.setAlignmentX(Component.CENTER_ALIGNMENT);
+        wylogujButton.setCursor(new Cursor(Cursor.HAND_CURSOR));
+        wylogujButton.addActionListener(e -> wyloguj());
+
+        mainPanel.add(wylogujButton);
         add(mainPanel);
         setVisible(true);
     }
@@ -98,5 +126,20 @@ public class MainPanel extends JFrame {
         wrapper.add(button, BorderLayout.CENTER);
 
         return wrapper;
+    }
+
+    private void wyloguj() {
+        int wybor = JOptionPane.showConfirmDialog(
+                this,
+                "Czy na pewno chcesz się wylogować?",
+                "Potwierdzenie wylogowania",
+                JOptionPane.YES_NO_OPTION,
+                JOptionPane.QUESTION_MESSAGE
+        );
+
+        if (wybor == JOptionPane.YES_OPTION) {
+            dispose();
+            SwingUtilities.invokeLater(() -> new client());
+        }
     }
 }

@@ -9,10 +9,18 @@ public class MagazynierForm extends JFrame {
 
     public MagazynierForm(String imie, String nazwisko) {
         setTitle("Panel główny - MAGAZYNIER");
-        setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
-        setSize(500, 500);
+        setDefaultCloseOperation(JFrame.DO_NOTHING_ON_CLOSE);
+        setSize(500, 550);
         setLocationRelativeTo(null);
         setResizable(false);
+
+        // Obsługa zamykania okna
+        addWindowListener(new java.awt.event.WindowAdapter() {
+            @Override
+            public void windowClosing(java.awt.event.WindowEvent windowEvent) {
+                wyloguj();
+            }
+        });
 
         JPanel panel = new JPanel();
         panel.setLayout(new BoxLayout(panel, BoxLayout.Y_AXIS));
@@ -27,14 +35,40 @@ public class MagazynierForm extends JFrame {
 
         panel.add(makeStyledButton("Przyjęcie towaru", e -> new PrzyjecieTowaruForm()));
         panel.add(makeStyledButton("Inwentaryzacja", e -> new InwentaryzacjaForm()));
-
         panel.add(makeStyledButton("Przygotuj paczki do wysyłki", e -> new PrzygotujPaczkiForm()));
         panel.add(makeStyledButton("Kontrola jakości towaru", e -> {
             // TODO: W przyszłości
+            JOptionPane.showMessageDialog(this, "Funkcja w trakcie rozwoju", "Informacja", JOptionPane.INFORMATION_MESSAGE);
         }));
         panel.add(makeStyledButton("Zgłoś brak towaru", e -> {
             // TODO: W przyszłości
+            JOptionPane.showMessageDialog(this, "Funkcja w trakcie rozwoju", "Informacja", JOptionPane.INFORMATION_MESSAGE);
         }));
+
+        // Separator i przycisk wyloguj
+        panel.add(Box.createRigidArea(new Dimension(0, 30)));
+        JSeparator separator = new JSeparator();
+        separator.setMaximumSize(new Dimension(Integer.MAX_VALUE, 1));
+        separator.setBackground(Color.GRAY);
+        panel.add(separator);
+        panel.add(Box.createRigidArea(new Dimension(0, 15)));
+
+        JButton wylogujButton = new JButton("🚪 Wyloguj");
+        wylogujButton.setFont(new Font("SansSerif", Font.BOLD, 14));
+        wylogujButton.setBackground(new Color(220, 53, 69));
+        wylogujButton.setForeground(Color.WHITE);
+        wylogujButton.setFocusPainted(false);
+        wylogujButton.setMaximumSize(new Dimension(200, 40));
+        wylogujButton.setAlignmentX(Component.CENTER_ALIGNMENT);
+        wylogujButton.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+        wylogujButton.addActionListener(e -> wyloguj());
+
+        JPanel wylogujWrapper = new JPanel(new BorderLayout());
+        wylogujWrapper.setBackground(new Color(248, 248, 248));
+        wylogujWrapper.setBorder(BorderFactory.createEmptyBorder(5, 0, 5, 0));
+        wylogujWrapper.setMaximumSize(new Dimension(Integer.MAX_VALUE, 50));
+        wylogujWrapper.add(wylogujButton, BorderLayout.CENTER);
+        panel.add(wylogujWrapper);
 
         add(panel);
         setVisible(true);
@@ -63,5 +97,20 @@ public class MagazynierForm extends JFrame {
         wrapper.add(button, BorderLayout.CENTER);
 
         return wrapper;
+    }
+
+    private void wyloguj() {
+        int wybor = JOptionPane.showConfirmDialog(
+                this,
+                "Czy na pewno chcesz się wylogować?",
+                "Potwierdzenie wylogowania",
+                JOptionPane.YES_NO_OPTION,
+                JOptionPane.QUESTION_MESSAGE
+        );
+
+        if (wybor == JOptionPane.YES_OPTION) {
+            dispose();
+            SwingUtilities.invokeLater(() -> new client());
+        }
     }
 }

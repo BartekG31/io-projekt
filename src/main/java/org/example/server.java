@@ -96,7 +96,19 @@ public class server {
                 } else if (command.startsWith("ZATWIERDZ_DOSTARCZENIE")) {
                     out.println(zmienStatus(command.split(";")[1], "Oczekiwanie na odbiór"));
 
-                } else {
+                }
+             else if (command.startsWith("ZGLOS_INCYDENT")) {
+                String[] parts = command.split(";", 4);
+                out.println(zglosIncydent(parts[1], parts[2], parts[3]));
+
+            } else if (command.startsWith("SPRAWDZ_STATUS_KURIERA")) {
+                out.println(sprawdzStatusKuriera());
+
+            } else if (command.startsWith("ZAKONCZENIE_TRASY")) {
+                    String[] parts = command.split(";", 4);
+                    out.println(zakonczTrase(parts[1], parts[2], parts[3]));
+                }
+                else {
                     out.println("ERROR;Nieznana komenda");
                 }
 
@@ -417,12 +429,75 @@ public class server {
             return "ERROR;" + e.getMessage();
         }
     }
+    private static String zglosIncydent(String typIncydentu, String lokalizacja, String opis) {
+        try (Connection conn = getConnection()) {
+            PreparedStatement stmt = conn.prepareStatement(
+                    "INSERT INTO INCYDENTY (TYP_INCYDENTU, LOKALIZACJA, OPIS_INCYDENTU, DATA_ZGLOSZENIA) " +
+                            "VALUES (?, ?, ?, SYSDATE)"
+            );
+            stmt.setString(1, typIncydentu);
+            stmt.setString(2, lokalizacja);
+            stmt.setString(3, opis);
+            stmt.executeUpdate();
+            return "OK;Incydent zostały zgłoszony do logistyka";
+        } catch (Exception e) {
+            return "ERROR;" + e.getMessage();
+        }
+    }
 
+    private static String sprawdzStatusKuriera() {
+        try (Connection conn = getConnection()) {
+            PreparedStatement stmt = conn.prepareStatement(
+                    "SELECT id_zlecenia, odbiorca, opis FROM ZLECENIA WHERE status = 'W drodze'"
+            );
+            ResultSet rs = stmt.executeQuery();
+            StringBuilder sb = new StringBuilder("OK");
+
+            while (rs.next()) {
+                sb.append(";")
+                        .append(rs.getInt("id_zlecenia")).append("|")
+                        .append(rs.getString("odbiorca")).append("|")
+                        .append(rs.getString("opis"));
+            }
+
+            return sb.toString();
+        } catch (Exception e) {
+            return "ERROR;" + e.getMessage();
+        }
+    }
+
+    private static String zakonczTrase(String kilometry, String spalanie, String raport) {
+        try (Connection conn = getConnection()) {
+            // Sprawdź czy są jeszcze paczki w drodze
+            PreparedStatement checkStmt = conn.prepareStatement(
+                    "SELECT COUNT(*) as count FROM ZLECENIA WHERE status = 'W drodze'"
+            );
+            ResultSet checkRs = checkStmt.executeQuery();
+
+            if (checkRs.next() && checkRs.getInt("count") > 0) {
+                return "ERROR;Nie można zakończyć trasy - pozostały niedostarczone paczki!";
+            }
+
+            // Zapisz raport z trasy
+            PreparedStatement stmt = conn.prepareStatement(
+                    "INSERT INTO RAPORTY_TRAS (KILOMETRY, SPALANIE, RAPORT, DATA_ZAKONCZENIA) " +
+                            "VALUES (?, ?, ?, SYSDATE)"
+            );
+            stmt.setInt(1, Integer.parseInt(kilometry));
+            stmt.setDouble(2, Double.parseDouble(spalanie));
+            stmt.setString(3, raport.isEmpty() ? "Brak uwag" : raport);
+            stmt.executeUpdate();
+
+            return "OK;Trasa została zakończona i raport przekazany do logistyka";
+        } catch (Exception e) {
+            return "ERROR;" + e.getMessage();
+        }
+    }
 
     private static Connection getConnection() throws SQLException {
-        String url = "jdbc:oracle:thin:@192.168.0.17:1521";
+        String url = "jdbc:oracle:thin:@localhost:1521";
         String username = "SYSTEM";
-        String password = "iop123";
+        String password = "admin";
         return DriverManager.getConnection(url, username, password);
     }
 }
