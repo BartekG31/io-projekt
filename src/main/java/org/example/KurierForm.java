@@ -26,6 +26,7 @@ public class KurierForm extends JFrame {
         panel.add(title);
 
         panel.add(makeStyledButton("Odbierz paczki z magazynu", e -> new OdbiorPaczkiKurierForm()));
+        panel.add(makeStyledButton("Dostarcz paczki", e -> new DostarczPaczkiForm()));
         panel.add(makeStyledButton("Zgłoś incydent", e -> {
             // TODO: w przyszłości
         }));

@@ -87,6 +87,15 @@ public class server {
 
                 } else if (command.startsWith("ODEBRANA_PRZEZ_KURIERA")) {
                     out.println(zmienStatus(command.split(";")[1], "W drodze"));
+                } else if (command.startsWith("ODEBRANA_PRZEZ_KURIERA")) {
+                    out.println(zmienStatus(command.split(";")[1], "W drodze"));
+
+                } else if (command.startsWith("POBIERZ_W_DRODZE")) {
+                    out.println(pobierzWDrodze());
+
+                } else if (command.startsWith("ZATWIERDZ_DOSTARCZENIE")) {
+                    out.println(zmienStatus(command.split(";")[1], "Oczekiwanie na odbiór"));
+
                 } else {
                     out.println("ERROR;Nieznana komenda");
                 }
@@ -184,7 +193,7 @@ public class server {
             PreparedStatement stmt = conn.prepareStatement(
                     "SELECT z.id_zlecenia, z.opis, z.waga, z.data_nadania, u.imie, u.nazwisko " +
                             "FROM ZLECENIA z JOIN UZYTKOWNIK u ON z.nadawca_id = u.id " +
-                            "WHERE z.odbiorca = ? AND z.status = 'Oczekuje na odbiór'"
+                            "WHERE z.odbiorca = ? AND z.status = 'Oczekiwanie na odbiór'"
             );
             stmt.setString(1, odbiorca);
             ResultSet rs = stmt.executeQuery();
@@ -229,7 +238,7 @@ public class server {
             stmt.setString(1, nowyStatus);
             stmt.setInt(2, Integer.parseInt(idZlecenia));
             return stmt.executeUpdate() > 0
-                    ? "OK;Zmieniono status na " + nowyStatus
+                    ? "OK;Przesyłka została odebrana."
                     : "ERROR;Nie znaleziono zlecenia";
         } catch (Exception e) {
             return "ERROR;" + e.getMessage();
@@ -387,6 +396,28 @@ public class server {
             return "ERROR;" + e.getMessage();
         }
     }
+
+    private static String pobierzWDrodze() {
+        try (Connection conn = getConnection()) {
+            PreparedStatement stmt = conn.prepareStatement(
+                    "SELECT id_zlecenia, odbiorca, opis, waga, data_nadania FROM ZLECENIA WHERE status = 'W drodze'"
+            );
+            ResultSet rs = stmt.executeQuery();
+            StringBuilder sb = new StringBuilder("OK");
+            while (rs.next()) {
+                sb.append(";")
+                        .append(rs.getInt("id_zlecenia")).append("|")
+                        .append(rs.getString("odbiorca")).append("|")
+                        .append(rs.getString("opis")).append("|")
+                        .append(rs.getDouble("waga")).append("|")
+                        .append(rs.getDate("data_nadania"));
+            }
+            return sb.length() == 2 ? "ERROR;Brak paczek w drodze" : sb.toString();
+        } catch (Exception e) {
+            return "ERROR;" + e.getMessage();
+        }
+    }
+
 
     private static Connection getConnection() throws SQLException {
         String url = "jdbc:oracle:thin:@192.168.0.17:1521";
