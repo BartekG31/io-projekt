@@ -52,7 +52,7 @@ public class LogistykForm extends JFrame {
         panel.add(createSectionLabel("📊 Monitorowanie i raporty"));
         panel.add(makeStyledButton("Status wszystkich zleceń", e -> new StatusZlecenForm()));
         panel.add(makeStyledButton("Przegląd incydentów", e -> new PrzegladIncydentowForm()));
-        panel.add(makeStyledButton("Generuj raport miesięczny", e -> new RaportMiesięcznyForm()));
+        panel.add(makeStyledButton("Generuj raport miesięczny", e -> new RaportMiesiecznyForm()));
 
         panel.add(Box.createRigidArea(new Dimension(0, 15)));
 
