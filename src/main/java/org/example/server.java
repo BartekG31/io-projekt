@@ -161,7 +161,62 @@ public class server {
                 } else if (command.startsWith("POBIERZ_PROBLEMY")) {
                     out.println(pobierzProblemy());
 
-                } else {
+                }else if (command.startsWith("POBIERZ_DOSTEPNE_POJAZDY")) {
+                    out.println(pobierzDostepnePojazdy());
+
+                } else if (command.startsWith("EDYTUJ_POJAZD")) {
+                    String[] parts = command.split(";", 7);
+                    out.println(edytujPojazd(parts[1], parts[2], parts[3], parts[4], parts[5], parts[6]));
+
+                } else if (command.startsWith("POBIERZ_KIEROWCOW")) {
+                    out.println(pobierzKierowcow());
+
+                } else if (command.startsWith("POBIERZ_ZLECENIA_DO_PRZYPISANIA")) {
+                    out.println(pobierzZleceniaDoprzypisania());
+
+                } else if (command.startsWith("POBIERZ_GOTOWE_DO_TRASY")) {
+                    out.println(pobierzGotoweDOTrasy());
+
+                } else if (command.startsWith("PRZYPISZ_POJAZD_DO_ZLECENIA")) {
+                    String[] parts = command.split(";", 3);
+                    out.println(przypiszPojazdDoZlecenia(parts[1], parts[2]));
+
+                } else if (command.startsWith("POBIERZ_HARMONOGRAM")) {
+                    String filter = command.split(";").length > 1 ? command.split(";")[1] : null;
+                    out.println(pobierzHarmonogram(filter));
+
+                } else if (command.startsWith("AKTUALIZUJ_STATUS_ZLECENIA")) {
+                    String[] parts = command.split(";", 3);
+                    out.println(aktualizujStatusZlecenia(parts[1], parts[2]));
+
+                } else if (command.startsWith("POBIERZ_WSZYSTKIE_ZLECENIA_LOGISTYK")) {
+                    out.println(pobierzWszystkieZleceniaLogistyk());
+
+                } else if (command.startsWith("ZMIEN_STATUS_ZLECENIA")) {
+                    String[] parts = command.split(";", 3);
+                    out.println(zmienStatusZlecenia(parts[1], parts[2]));
+
+                } else if (command.startsWith("POBIERZ_SZCZEGOLY_ZLECENIA")) {
+                    out.println(pobierzSzczególyZlecenia(command.split(";")[1]));
+
+                } else if (command.startsWith("POBIERZ_AKTYWNE_TRASY")) {
+                    out.println(pobierzAktywneTrasy());
+
+                } else if (command.startsWith("POBIERZ_SZCZEGOLY_TRASY")) {
+                    out.println(pobierzSzczególyTrasy(command.split(";")[1]));
+
+                } else if (command.startsWith("ANULUJ_TRASE")) {
+                    out.println(anulujTrase(command.split(";")[1]));
+
+                } else if (command.startsWith("OZNACZ_INCYDENT_ROZWIAZANY")) {
+                    out.println(oznaczIncydentRozwiazany(command.split(";")[1]));
+
+                } else if (command.startsWith("USUN_INCYDENT")) {
+                    out.println(usunIncydent(command.split(";")[1]));
+
+                } else if (command.startsWith("POBIERZ_SZCZEGOLY_INCYDENTU")) {
+                    out.println(pobierzSzczególyIncydentu(command.split(";")[1]));
+                }else {
                     out.println("ERROR;Nieznana komenda");
                 }
 
@@ -949,7 +1004,350 @@ public class server {
             return "ERROR;" + e.getMessage();
         }
     }
+    private static String pobierzDostepnePojazdy() {
+        try (Connection conn = getConnection()) {
+            PreparedStatement stmt = conn.prepareStatement(
+                    "SELECT id, marka, model, numer_rejestracyjny FROM POJAZDY WHERE status = 'Dostępny'"
+            );
+            ResultSet rs = stmt.executeQuery();
+            StringBuilder sb = new StringBuilder("OK");
+            while (rs.next()) {
+                sb.append(";").append(rs.getInt("id")).append("|")
+                        .append(rs.getString("marka")).append("|")
+                        .append(rs.getString("model")).append("|")
+                        .append(rs.getString("numer_rejestracyjny"));
+            }
+            return sb.length() == 2 ? "ERROR;Brak dostępnych pojazdów" : sb.toString();
+        } catch (Exception e) {
+            return "ERROR;" + e.getMessage();
+        }
+    }
 
+    private static String edytujPojazd(String id, String marka, String model, String rejestracja, String status, String uwagi) {
+        try (Connection conn = getConnection()) {
+            PreparedStatement stmt = conn.prepareStatement(
+                    "UPDATE POJAZDY SET marka = ?, model = ?, numer_rejestracyjny = ?, status = ?, uwagi = ? WHERE id = ?"
+            );
+            stmt.setString(1, marka);
+            stmt.setString(2, model);
+            stmt.setString(3, rejestracja);
+            stmt.setString(4, status);
+            stmt.setString(5, uwagi);
+            stmt.setInt(6, Integer.parseInt(id));
+            int rows = stmt.executeUpdate();
+            return rows > 0 ? "OK;Pojazd został zaktualizowany" : "ERROR;Nie znaleziono pojazdu";
+        } catch (Exception e) {
+            return "ERROR;" + e.getMessage();
+        }
+    }
+
+    private static String pobierzKierowcow() {
+        try (Connection conn = getConnection()) {
+            PreparedStatement stmt = conn.prepareStatement(
+                    "SELECT imie || ' ' || nazwisko as kierowca FROM UZYTKOWNIK WHERE rola = 'KURIER'"
+            );
+            ResultSet rs = stmt.executeQuery();
+            StringBuilder sb = new StringBuilder("OK");
+            while (rs.next()) {
+                sb.append(";").append(rs.getString("kierowca"));
+            }
+            return sb.length() == 2 ? "ERROR;Brak kierowców" : sb.toString();
+        } catch (Exception e) {
+            return "ERROR;" + e.getMessage();
+        }
+    }
+
+    private static String pobierzZleceniaDoprzypisania() {
+        try (Connection conn = getConnection()) {
+            PreparedStatement stmt = conn.prepareStatement(
+                    "SELECT z.id_zlecenia, u.imie || ' ' || u.nazwisko as nadawca, z.odbiorca, z.miasto, z.waga, z.status " +
+                            "FROM ZLECENIA z JOIN UZYTKOWNIK u ON z.nadawca_id = u.id " +
+                            "WHERE z.status IN ('Gotowe do wysyłki', 'Przyjęte') AND z.pojazd_id IS NULL"
+            );
+            ResultSet rs = stmt.executeQuery();
+            StringBuilder sb = new StringBuilder("OK");
+            while (rs.next()) {
+                sb.append(";").append(rs.getInt("id_zlecenia")).append("|")
+                        .append(rs.getString("nadawca")).append("|")
+                        .append(rs.getString("odbiorca")).append("|")
+                        .append(rs.getString("miasto")).append("|")
+                        .append(rs.getDouble("waga")).append("|")
+                        .append(rs.getString("status"));
+            }
+            return sb.length() == 2 ? "ERROR;Brak zleceń do przypisania" : sb.toString();
+        } catch (Exception e) {
+            return "ERROR;" + e.getMessage();
+        }
+    }
+
+    private static String pobierzGotoweDOTrasy() {
+        try (Connection conn = getConnection()) {
+            PreparedStatement stmt = conn.prepareStatement(
+                    "SELECT id_zlecenia, odbiorca, miasto, adres, waga FROM ZLECENIA " +
+                            "WHERE status = 'Gotowe do wysyłki' AND pojazd_id IS NOT NULL"
+            );
+            ResultSet rs = stmt.executeQuery();
+            StringBuilder sb = new StringBuilder("OK");
+            while (rs.next()) {
+                sb.append(";").append(rs.getInt("id_zlecenia")).append("|")
+                        .append(rs.getString("odbiorca")).append("|")
+                        .append(rs.getString("miasto")).append("|")
+                        .append(rs.getString("adres")).append("|")
+                        .append(rs.getDouble("waga"));
+            }
+            return sb.length() == 2 ? "ERROR;Brak gotowych zleceń" : sb.toString();
+        } catch (Exception e) {
+            return "ERROR;" + e.getMessage();
+        }
+    }
+
+    private static String przypiszPojazdDoZlecenia(String idZlecenia, String idPojazdu) {
+        try (Connection conn = getConnection()) {
+            // Sprawdź czy pojazd jest dostępny
+            PreparedStatement checkStmt = conn.prepareStatement(
+                    "SELECT status FROM POJAZDY WHERE id = ?"
+            );
+            checkStmt.setInt(1, Integer.parseInt(idPojazdu));
+            ResultSet checkRs = checkStmt.executeQuery();
+
+            if (!checkRs.next() || !"Dostępny".equals(checkRs.getString("status"))) {
+                return "ERROR;Pojazd nie jest dostępny";
+            }
+
+            // Przypisz pojazd
+            PreparedStatement stmt = conn.prepareStatement(
+                    "UPDATE ZLECENIA SET pojazd_id = ? WHERE id_zlecenia = ?"
+            );
+            stmt.setInt(1, Integer.parseInt(idPojazdu));
+            stmt.setInt(2, Integer.parseInt(idZlecenia));
+
+            // Zmień status pojazdu na zajęty
+            PreparedStatement updateStmt = conn.prepareStatement(
+                    "UPDATE POJAZDY SET status = 'Zajęty' WHERE id = ?"
+            );
+            updateStmt.setInt(1, Integer.parseInt(idPojazdu));
+
+            int rows = stmt.executeUpdate();
+            updateStmt.executeUpdate();
+
+            return rows > 0 ? "OK;Pojazd został przypisany" : "ERROR;Nie znaleziono zlecenia";
+        } catch (Exception e) {
+            return "ERROR;" + e.getMessage();
+        }
+    }
+
+    private static String pobierzHarmonogram(String filter) {
+        try (Connection conn = getConnection()) {
+            String sql = "SELECT z.id_zlecenia, z.data_nadania, u.imie || ' ' || u.nazwisko as nadawca, " +
+                    "z.odbiorca, z.miasto, z.adres, " +
+                    "COALESCE(p.marka || ' ' || p.model, 'Brak') as pojazd, " +
+                    "COALESCE(k.imie || ' ' || k.nazwisko, 'Nieprzypisany') as kierowca, " +
+                    "z.status " +
+                    "FROM ZLECENIA z " +
+                    "JOIN UZYTKOWNIK u ON z.nadawca_id = u.id " +
+                    "LEFT JOIN POJAZDY p ON z.pojazd_id = p.id " +
+                    "LEFT JOIN UZYTKOWNIK k ON k.rola = 'KURIER'";
+
+            if (filter != null && !filter.equals("Wszystkie")) {
+                sql += " WHERE z.status = ?";
+            }
+            sql += " ORDER BY z.data_nadania DESC";
+
+            PreparedStatement stmt = conn.prepareStatement(sql);
+            if (filter != null && !filter.equals("Wszystkie")) {
+                stmt.setString(1, filter);
+            }
+
+            ResultSet rs = stmt.executeQuery();
+            StringBuilder sb = new StringBuilder("OK");
+            while (rs.next()) {
+                sb.append(";").append(rs.getInt("id_zlecenia")).append("|")
+                        .append(rs.getDate("data_nadania")).append("|")
+                        .append(rs.getString("nadawca")).append("|")
+                        .append(rs.getString("odbiorca")).append("|")
+                        .append(rs.getString("miasto")).append("|")
+                        .append(rs.getString("adres")).append("|")
+                        .append(rs.getString("pojazd")).append("|")
+                        .append(rs.getString("kierowca")).append("|")
+                        .append(rs.getString("status"));
+            }
+            return sb.length() == 2 ? "ERROR;Brak zleceń" : sb.toString();
+        } catch (Exception e) {
+            return "ERROR;" + e.getMessage();
+        }
+    }
+
+    private static String aktualizujStatusZlecenia(String idZlecenia, String nowyStatus) {
+        return zmienStatus(idZlecenia, nowyStatus);
+    }
+
+    private static String pobierzWszystkieZleceniaLogistyk() {
+        try (Connection conn = getConnection()) {
+            PreparedStatement stmt = conn.prepareStatement(
+                    "SELECT z.id_zlecenia, u.imie || ' ' || u.nazwisko as nadawca, z.odbiorca, " +
+                            "z.adres, z.miasto, z.opis, z.waga, z.data_nadania, z.status, " +
+                            "COALESCE(p.marka || ' ' || p.model, '-') as pojazd " +
+                            "FROM ZLECENIA z " +
+                            "JOIN UZYTKOWNIK u ON z.nadawca_id = u.id " +
+                            "LEFT JOIN POJAZDY p ON z.pojazd_id = p.id " +
+                            "ORDER BY z.data_nadania DESC"
+            );
+            ResultSet rs = stmt.executeQuery();
+            StringBuilder sb = new StringBuilder("OK");
+            while (rs.next()) {
+                sb.append(";").append(rs.getInt("id_zlecenia")).append("|")
+                        .append(rs.getString("nadawca")).append("|")
+                        .append(rs.getString("odbiorca")).append("|")
+                        .append(rs.getString("adres")).append("|")
+                        .append(rs.getString("miasto")).append("|")
+                        .append(rs.getString("opis")).append("|")
+                        .append(rs.getDouble("waga")).append("|")
+                        .append(rs.getDate("data_nadania")).append("|")
+                        .append(rs.getString("status")).append("|")
+                        .append(rs.getString("pojazd"));
+            }
+            return sb.length() == 2 ? "ERROR;Brak zleceń" : sb.toString();
+        } catch (Exception e) {
+            return "ERROR;" + e.getMessage();
+        }
+    }
+
+    private static String zmienStatusZlecenia(String idZlecenia, String nowyStatus) {
+        return zmienStatus(idZlecenia, nowyStatus);
+    }
+
+    private static String pobierzAktywneTrasy() {
+        try (Connection conn = getConnection()) {
+            PreparedStatement stmt = conn.prepareStatement(
+                    "SELECT DISTINCT p.id as trasa_id, k.imie || ' ' || k.nazwisko as kierowca, " +
+                            "'W trakcie' as status, COUNT(z.id_zlecenia) as liczba_zlecen, " +
+                            "SYSDATE as data_rozpoczecia, '120' as szacunkowy_czas " +
+                            "FROM POJAZDY p " +
+                            "JOIN ZLECENIA z ON p.id = z.pojazd_id " +
+                            "LEFT JOIN UZYTKOWNIK k ON k.rola = 'KURIER' " +
+                            "WHERE z.status IN ('W drodze', 'Przypisane') " +
+                            "GROUP BY p.id, k.imie, k.nazwisko"
+            );
+            ResultSet rs = stmt.executeQuery();
+            StringBuilder sb = new StringBuilder("OK");
+            while (rs.next()) {
+                sb.append(";").append(rs.getInt("trasa_id")).append("|")
+                        .append(rs.getString("kierowca")).append("|")
+                        .append(rs.getString("status")).append("|")
+                        .append(rs.getInt("liczba_zlecen")).append("|")
+                        .append(rs.getTimestamp("data_rozpoczecia")).append("|")
+                        .append(rs.getString("szacunkowy_czas"));
+            }
+            return sb.length() == 2 ? "ERROR;Brak aktywnych tras" : sb.toString();
+        } catch (Exception e) {
+            return "ERROR;" + e.getMessage();
+        }
+    }
+
+    private static String pobierzSzczególyTrasy(String idTrasy) {
+        try (Connection conn = getConnection()) {
+            PreparedStatement stmt = conn.prepareStatement(
+                    "SELECT k.imie || ' ' || k.nazwisko as kierowca, 'W trakcie' as status, " +
+                            "COUNT(z.id_zlecenia) as liczba_zlecen, SYSDATE as data_utworzenia, " +
+                            "SYSDATE as data_rozpoczecia, '120' as szacunkowy_czas, " +
+                            "NULL as data_zakonczenia, 'Trasa w realizacji' as uwagi, " +
+                            "p.marka || ' ' || p.model as pojazd_info " +
+                            "FROM POJAZDY p " +
+                            "JOIN ZLECENIA z ON p.id = z.pojazd_id " +
+                            "LEFT JOIN UZYTKOWNIK k ON k.rola = 'KURIER' " +
+                            "WHERE p.id = ? AND z.status IN ('W drodze', 'Przypisane') " +
+                            "GROUP BY p.id, k.imie, k.nazwisko, p.marka, p.model"
+            );
+            stmt.setInt(1, Integer.parseInt(idTrasy));
+            ResultSet rs = stmt.executeQuery();
+
+            if (rs.next()) {
+                return "OK;" + rs.getString("kierowca") + "|" +
+                        rs.getString("status") + "|" +
+                        rs.getInt("liczba_zlecen") + "|" +
+                        rs.getTimestamp("data_utworzenia") + "|" +
+                        rs.getTimestamp("data_rozpoczecia") + "|" +
+                        rs.getString("szacunkowy_czas") + "|" +
+                        rs.getTimestamp("data_zakonczenia") + "|" +
+                        rs.getString("uwagi") + "|" +
+                        rs.getString("pojazd_info");
+            } else {
+                return "ERROR;Nie znaleziono trasy";
+            }
+        } catch (Exception e) {
+            return "ERROR;" + e.getMessage();
+        }
+    }
+
+    private static String anulujTrase(String idTrasy) {
+        try (Connection conn = getConnection()) {
+            // Zwolnij pojazd
+            PreparedStatement updatePojazd = conn.prepareStatement(
+                    "UPDATE POJAZDY SET status = 'Dostępny' WHERE id = ?"
+            );
+            updatePojazd.setInt(1, Integer.parseInt(idTrasy));
+            updatePojazd.executeUpdate();
+
+            // Zmień status zleceń
+            PreparedStatement updateZlecenia = conn.prepareStatement(
+                    "UPDATE ZLECENIA SET pojazd_id = NULL, status = 'Gotowe do wysyłki' " +
+                            "WHERE pojazd_id = ? AND status IN ('Przypisane', 'W drodze')"
+            );
+            updateZlecenia.setInt(1, Integer.parseInt(idTrasy));
+            int rows = updateZlecenia.executeUpdate();
+
+            return rows > 0 ? "OK;Trasa została anulowana" : "ERROR;Nie znaleziono trasy";
+        } catch (Exception e) {
+            return "ERROR;" + e.getMessage();
+        }
+    }
+
+    private static String oznaczIncydentRozwiazany(String idIncydentu) {
+        try (Connection conn = getConnection()) {
+            PreparedStatement stmt = conn.prepareStatement(
+                    "UPDATE INCYDENTY SET status = 'Rozwiązany' WHERE id = ?"
+            );
+            stmt.setInt(1, Integer.parseInt(idIncydentu));
+            int rows = stmt.executeUpdate();
+            return rows > 0 ? "OK;Incydent oznaczony jako rozwiązany" : "ERROR;Nie znaleziono incydentu";
+        } catch (Exception e) {
+            return "ERROR;" + e.getMessage();
+        }
+    }
+
+    private static String usunIncydent(String idIncydentu) {
+        try (Connection conn = getConnection()) {
+            PreparedStatement stmt = conn.prepareStatement("DELETE FROM INCYDENTY WHERE id = ?");
+            stmt.setInt(1, Integer.parseInt(idIncydentu));
+            int rows = stmt.executeUpdate();
+            return rows > 0 ? "OK;Incydent został usunięty" : "ERROR;Nie znaleziono incydentu";
+        } catch (Exception e) {
+            return "ERROR;" + e.getMessage();
+        }
+    }
+
+    private static String pobierzSzczególyIncydentu(String idIncydentu) {
+        try (Connection conn = getConnection()) {
+            PreparedStatement stmt = conn.prepareStatement(
+                    "SELECT typ_incydentu, lokalizacja, data_zgloszenia, opis_incydentu, " +
+                            "COALESCE(status, 'Nowy') as status FROM INCYDENTY WHERE id = ?"
+            );
+            stmt.setInt(1, Integer.parseInt(idIncydentu));
+            ResultSet rs = stmt.executeQuery();
+
+            if (rs.next()) {
+                return "OK;" + rs.getString("typ_incydentu") + "|" +
+                        rs.getString("lokalizacja") + "|" +
+                        rs.getTimestamp("data_zgloszenia") + "|" +
+                        rs.getString("opis_incydentu") + "|" +
+                        rs.getString("status");
+            } else {
+                return "ERROR;Nie znaleziono incydentu";
+            }
+        } catch (Exception e) {
+            return "ERROR;" + e.getMessage();
+        }
+    }
     private static Connection getConnection() throws SQLException {
         String url = "jdbc:oracle:thin:@localhost:1521";
         String username = "SYSTEM";
