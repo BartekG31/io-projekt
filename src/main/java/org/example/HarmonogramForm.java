@@ -115,10 +115,20 @@ public class HarmonogramForm extends JFrame {
         eksportButton.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
         eksportButton.addActionListener(e -> eksportujHarmonogram());
 
+        // POPRAWKA: Dodaj przycisk przypisania kierowcy
+        JButton przypiszKierowceButton = new JButton("👤 Przypisz kierowcę");
+        przypiszKierowceButton.setBackground(new Color(255, 99, 71));
+        przypiszKierowceButton.setForeground(Color.WHITE);
+        przypiszKierowceButton.setFont(new Font("SansSerif", Font.BOLD, 12));
+        przypiszKierowceButton.setFocusPainted(false);
+        przypiszKierowceButton.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+        przypiszKierowceButton.addActionListener(e -> przypiszKierowce());
+
         buttonPanel.add(szczegolyButton);
         buttonPanel.add(aktualizujButton);
         buttonPanel.add(odswiezButton);
         buttonPanel.add(eksportButton);
+        buttonPanel.add(przypiszKierowceButton); // DODAJ TUTAJ
 
         bottomPanel.add(statusLabel, BorderLayout.WEST);
         bottomPanel.add(buttonPanel, BorderLayout.EAST);
@@ -193,6 +203,79 @@ public class HarmonogramForm extends JFrame {
                 return c;
             }
         });
+    }
+
+    // POPRAWKA: Dodaj implementację metody przypiszKierowce
+    private void przypiszKierowce() {
+        int selectedRow = harmonogramTable.getSelectedRow();
+        if (selectedRow == -1) {
+            JOptionPane.showMessageDialog(this, "Wybierz zlecenie aby przypisać kierowcę.", "Uwaga", JOptionPane.WARNING_MESSAGE);
+            return;
+        }
+
+        int zlecenieId = (int) tableModel.getValueAt(selectedRow, 0);
+
+        // Pobierz listę kierowców
+        String[] kierowcy = pobierzListeKierowcow();
+        if (kierowcy.length == 0) {
+            JOptionPane.showMessageDialog(this, "Brak dostępnych kierowców w systemie.", "Błąd", JOptionPane.ERROR_MESSAGE);
+            return;
+        }
+
+        String wybranyKierowca = (String) JOptionPane.showInputDialog(
+                this, "Wybierz kierowcę dla zlecenia #" + zlecenieId + ":", "Przypisanie kierowcy",
+                JOptionPane.QUESTION_MESSAGE, null, kierowcy, kierowcy[0]
+        );
+
+        if (wybranyKierowca != null) {
+            przypiszKierowceDoZlecenia(zlecenieId, wybranyKierowca);
+        }
+    }
+
+    // POPRAWKA: Dodaj implementację pobierania listy kierowców
+    private String[] pobierzListeKierowcow() {
+        try (Socket socket = new Socket("localhost", 5000);
+             PrintWriter out = new PrintWriter(socket.getOutputStream(), true);
+             BufferedReader in = new BufferedReader(new InputStreamReader(socket.getInputStream()))) {
+
+            out.println("POBIERZ_KIEROWCOW");
+            String response = in.readLine();
+
+            if (response.startsWith("OK")) {
+                String[] parts = response.split(";");
+                String[] kierowcy = new String[parts.length - 1];
+                for (int i = 1; i < parts.length; i++) {
+                    kierowcy[i - 1] = parts[i];
+                }
+                return kierowcy;
+            } else {
+                return new String[0];
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+            return new String[0];
+        }
+    }
+
+    // POPRAWKA: Dodaj implementację przypisywania kierowcy do zlecenia
+    private void przypiszKierowceDoZlecenia(int zlecenieId, String kierowca) {
+        try (Socket socket = new Socket("localhost", 5000);
+             PrintWriter out = new PrintWriter(socket.getOutputStream(), true);
+             BufferedReader in = new BufferedReader(new InputStreamReader(socket.getInputStream()))) {
+
+            out.println("PRZYPISZ_KIEROWCE_DO_ZLECENIA;" + zlecenieId + ";" + kierowca);
+            String response = in.readLine();
+
+            if (response.startsWith("OK")) {
+                JOptionPane.showMessageDialog(this, "Kierowca został przypisany do zlecenia!", "Sukces", JOptionPane.INFORMATION_MESSAGE);
+                wczytajHarmonogram(); // Odśwież tabelę
+            } else {
+                JOptionPane.showMessageDialog(this, "Błąd podczas przypisywania kierowcy: " + response.split(";", 2)[1], "Błąd", JOptionPane.ERROR_MESSAGE);
+            }
+
+        } catch (Exception e) {
+            JOptionPane.showMessageDialog(this, "Błąd połączenia z serwerem: " + e.getMessage(), "Błąd", JOptionPane.ERROR_MESSAGE);
+        }
     }
 
     private void wczytajHarmonogram() {

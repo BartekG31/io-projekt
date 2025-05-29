@@ -33,7 +33,10 @@ public class server {
                     out.println(handleLogin(parts[1], parts[2]));
 
                     // Operacje klienta
-                } else if (command.startsWith("DODAJ_ZLECENIE")) {
+                } else if (command.startsWith("PRZYPISZ_KIEROWCE_DO_ZLECENIA")) {
+                    String[] parts = command.split(";", 3);
+                    out.println(przypiszKierowcaDoZlecenia(parts[1], parts[2]));
+                }else if (command.startsWith("DODAJ_ZLECENIE")) {
                     out.println(dodajZlecenie(command.split(";")));
 
                 } else if (command.startsWith("POBIERZ_DO_ODBIORU")) {
@@ -119,8 +122,8 @@ public class server {
                     out.println(pobierzPojazdy());
 
                 } else if (command.startsWith("DODAJ_POJAZD")) {
-                    String[] parts = command.split(";", 4);
-                    out.println(dodajPojazd(parts[1], parts[2], parts[3]));
+                    String[] parts = command.split(";", 6);
+                    out.println(dodajPojazd(parts[1], parts[2], parts[3], parts[4], parts[5]));
 
                 } else if (command.startsWith("USUN_POJAZD")) {
                     out.println(usunPojazd(command.split(";")[1]));
@@ -462,7 +465,35 @@ public class server {
             return "ERROR;" + e.getMessage();
         }
     }
+    // Dodaj nową metodę w server.java
+    private static String przypiszKierowcaDoZlecenia(String idZlecenia, String kierowcaName) {
+        try (Connection conn = getConnection()) {
+            // Znajdź ID kierowcy po imieniu i nazwisku
+            PreparedStatement findKierowca = conn.prepareStatement(
+                    "SELECT id FROM UZYTKOWNIK WHERE (imie || ' ' || nazwisko) = ? AND rola = 'KURIER'"
+            );
+            findKierowca.setString(1, kierowcaName);
+            ResultSet rs = findKierowca.executeQuery();
 
+            if (!rs.next()) {
+                return "ERROR;Nie znaleziono kierowcy";
+            }
+
+            int kierowcaId = rs.getInt("id");
+
+            // Przypisz kierowcę do zlecenia
+            PreparedStatement stmt = conn.prepareStatement(
+                    "UPDATE ZLECENIA SET KIEROWCA_ID = ? WHERE ID_ZLECENIA = ?"
+            );
+            stmt.setInt(1, kierowcaId);
+            stmt.setInt(2, Integer.parseInt(idZlecenia));
+
+            int rows = stmt.executeUpdate();
+            return rows > 0 ? "OK;Kierowca został przypisany" : "ERROR;Nie znaleziono zlecenia";
+        } catch (Exception e) {
+            return "ERROR;" + e.getMessage();
+        }
+    }
     private static String pobierzNowePaczki() {
         try (Connection conn = getConnection()) {
             PreparedStatement stmt = conn.prepareStatement(
@@ -635,7 +666,7 @@ public class server {
     private static String pobierzPojazdy() {
         try (Connection conn = getConnection()) {
             PreparedStatement stmt = conn.prepareStatement(
-                    "SELECT id, marka, model, numer_rejestracyjny, status FROM POJAZDY ORDER BY marka, model"
+                    "SELECT id, marka, model, rejestracja, status, uwagi FROM POJAZDY ORDER BY marka, model"
             );
             ResultSet rs = stmt.executeQuery();
             StringBuilder sb = new StringBuilder("OK");
@@ -643,23 +674,26 @@ public class server {
                 sb.append(";").append(rs.getInt("id")).append("|")
                         .append(rs.getString("marka")).append("|")
                         .append(rs.getString("model")).append("|")
-                        .append(rs.getString("numer_rejestracyjny")).append("|")
-                        .append(rs.getString("status"));
+                        .append(rs.getString("rejestracja")).append("|")
+                        .append(rs.getString("status")).append("|")
+                        .append(rs.getString("uwagi") != null ? rs.getString("uwagi") : "");
             }
-            return sb.length() == 2 ? "ERROR;Brak pojazdów" : sb.toString();
+            return sb.length() == 2 ? "ERROR;Brak pojazdów w systemie" : sb.toString();
         } catch (Exception e) {
             return "ERROR;" + e.getMessage();
         }
     }
 
-    private static String dodajPojazd(String marka, String model, String numerRejestracyjny) {
+    private static String dodajPojazd(String marka, String model, String numerRejestracyjny, String status, String uwagi) {
         try (Connection conn = getConnection()) {
             PreparedStatement stmt = conn.prepareStatement(
-                    "INSERT INTO POJAZDY (marka, model, numer_rejestracyjny, status) VALUES (?, ?, ?, 'Dostępny')"
+                    "INSERT INTO POJAZDY (marka, model, rejestracja, status, uwagi) VALUES (?, ?, ?, ?, ?)"
             );
             stmt.setString(1, marka);
             stmt.setString(2, model);
             stmt.setString(3, numerRejestracyjny);
+            stmt.setString(4, status);
+            stmt.setString(5, uwagi);
             stmt.executeUpdate();
             return "OK;Pojazd został dodany";
         } catch (Exception e) {
@@ -1007,7 +1041,7 @@ public class server {
     private static String pobierzDostepnePojazdy() {
         try (Connection conn = getConnection()) {
             PreparedStatement stmt = conn.prepareStatement(
-                    "SELECT id, marka, model, numer_rejestracyjny FROM POJAZDY WHERE status = 'Dostępny'"
+                    "SELECT id, marka, model, rejestracja FROM POJAZDY WHERE status = 'Dostępny'"
             );
             ResultSet rs = stmt.executeQuery();
             StringBuilder sb = new StringBuilder("OK");
@@ -1015,7 +1049,7 @@ public class server {
                 sb.append(";").append(rs.getInt("id")).append("|")
                         .append(rs.getString("marka")).append("|")
                         .append(rs.getString("model")).append("|")
-                        .append(rs.getString("numer_rejestracyjny"));
+                        .append(rs.getString("rejestracja"));
             }
             return sb.length() == 2 ? "ERROR;Brak dostępnych pojazdów" : sb.toString();
         } catch (Exception e) {
@@ -1026,7 +1060,7 @@ public class server {
     private static String edytujPojazd(String id, String marka, String model, String rejestracja, String status, String uwagi) {
         try (Connection conn = getConnection()) {
             PreparedStatement stmt = conn.prepareStatement(
-                    "UPDATE POJAZDY SET marka = ?, model = ?, numer_rejestracyjny = ?, status = ?, uwagi = ? WHERE id = ?"
+                    "UPDATE POJAZDY SET marka = ?, model = ?, rejestracja = ?, status = ?, uwagi = ? WHERE id = ?"
             );
             stmt.setString(1, marka);
             stmt.setString(2, model);
@@ -1040,7 +1074,6 @@ public class server {
             return "ERROR;" + e.getMessage();
         }
     }
-
     private static String pobierzKierowcow() {
         try (Connection conn = getConnection()) {
             PreparedStatement stmt = conn.prepareStatement(
@@ -1146,7 +1179,7 @@ public class server {
                     "FROM ZLECENIA z " +
                     "JOIN UZYTKOWNIK u ON z.nadawca_id = u.id " +
                     "LEFT JOIN POJAZDY p ON z.pojazd_id = p.id " +
-                    "LEFT JOIN UZYTKOWNIK k ON k.rola = 'KURIER'";
+                    "LEFT JOIN UZYTKOWNIK k ON z.kierowca_id = k.id AND k.rola = 'KURIER'"; // POPRAWKA TUTAJ
 
             if (filter != null && !filter.equals("Wszystkie")) {
                 sql += " WHERE z.status = ?";
