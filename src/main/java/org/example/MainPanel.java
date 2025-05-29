@@ -64,7 +64,7 @@ public class MainPanel extends JFrame {
             buttonPanel.add(makeButton("Zaktualizuj dane kontaktowe", () ->
                     new AktualizacjaDanychForm(idUzytkownika)));
 
-        }  else if (rola.equalsIgnoreCase("MAGAZYNIER")) {
+        } else if (rola.equalsIgnoreCase("MAGAZYNIER")) {
             new MagazynierForm(pelneImieNazwisko, "");
             dispose();
             return;
@@ -73,6 +73,13 @@ public class MainPanel extends JFrame {
             String imie = dane.length > 0 ? dane[0] : "";
             String nazwisko = dane.length > 1 ? dane[1] : "";
             new KurierForm(imie, nazwisko);
+            dispose();
+            return;
+        } else if (rola.equalsIgnoreCase("LOGISTYK")) {
+            String[] dane = pelneImieNazwisko.trim().split(" ", 2);
+            String imie = dane.length > 0 ? dane[0] : "";
+            String nazwisko = dane.length > 1 ? dane[1] : "";
+            new LogistykForm(imie, nazwisko);
             dispose();
             return;
         } else {
