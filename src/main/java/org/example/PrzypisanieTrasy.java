@@ -361,13 +361,40 @@ public class PrzypisanieTrasy extends JFrame {
 
         String uwagi = uwagaArea.getText().trim();
 
-        int result = JOptionPane.showConfirmDialog(this,
-                String.format("Czy przypisać trasę z %d zleceniami do kierowcy:\n%s?", wybraneZlecenia.size(), kierowca),
-                "Potwierdzenie przypisania",
-                JOptionPane.YES_NO_OPTION);
+        // Sprawdź czy kierowca ma już aktywne zlecenia
+        try (Socket socket = new Socket("localhost", 5000);
+             PrintWriter out = new PrintWriter(socket.getOutputStream(), true);
+             BufferedReader in = new BufferedReader(new InputStreamReader(socket.getInputStream()))) {
 
-        if (result == JOptionPane.YES_OPTION) {
-            przypiszTraseDoKierowcy(kierowca, uwagi);
+            out.println("SPRAWDZ_DOSTEPNOSC_KIEROWCY;" + kierowca);
+            String sprawdzenie = in.readLine();
+
+            if (sprawdzenie.startsWith("OK")) {
+                int aktywneZlecenia = Integer.parseInt(sprawdzenie.split(";")[1]);
+
+                String message = String.format(
+                        "Czy przypisać trasę z %d zleceniami do kierowcy:\n%s?\n\n" +
+                                "Kierowca ma obecnie %d aktywnych zleceń.",
+                        wybraneZlecenia.size(), kierowca, aktywneZlecenia
+                );
+
+                int result = JOptionPane.showConfirmDialog(this, message, "Potwierdzenie przypisania", JOptionPane.YES_NO_OPTION);
+
+                if (result == JOptionPane.YES_OPTION) {
+                    przypiszTraseDoKierowcy(kierowca, uwagi);
+                }
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+            // Jeśli błąd sprawdzania, kontynuuj normalnie
+            int result = JOptionPane.showConfirmDialog(this,
+                    String.format("Czy przypisać trasę z %d zleceniami do kierowcy:\n%s?", wybraneZlecenia.size(), kierowca),
+                    "Potwierdzenie przypisania",
+                    JOptionPane.YES_NO_OPTION);
+
+            if (result == JOptionPane.YES_OPTION) {
+                przypiszTraseDoKierowcy(kierowca, uwagi);
+            }
         }
     }
 
@@ -382,7 +409,8 @@ public class PrzypisanieTrasy extends JFrame {
                 zleceniaIds.append(wybraneZlecenia.get(i));
             }
 
-            String komenda = "PRZYPISZ_TRASE;" + kierowca + ";" + zleceniaIds.toString() + ";" + uwagi;
+            // Użyj nowej komendy z uwagami
+            String komenda = "PRZYPISZ_TRASE_Z_UWAGAMI;" + kierowca + ";" + zleceniaIds.toString() + ";" + uwagi;
             out.println(komenda);
             String response = in.readLine();
 

@@ -127,7 +127,7 @@ public class ZarzadzajPojazdamiForm extends JFrame {
 
         // Status
         formPanel.add(new JLabel("Status:"));
-        statusBox = new JComboBox<>(new String[]{"Dostępny", "Zajęty", "W naprawie", "Nieaktywny"});
+        statusBox = new JComboBox<>(new String[]{"Dostepny", "Zajety", "W_naprawie", "Nieaktywny"});
         statusBox.setMaximumSize(new Dimension(Integer.MAX_VALUE, 30));
         formPanel.add(statusBox);
         formPanel.add(Box.createRigidArea(new Dimension(0, 10)));

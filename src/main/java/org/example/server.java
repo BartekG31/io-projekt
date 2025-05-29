@@ -219,6 +219,25 @@ public class server {
 
                 } else if (command.startsWith("POBIERZ_SZCZEGOLY_INCYDENTU")) {
                     out.println(pobierzSzczególyIncydentu(command.split(";")[1]));
+                }else if (command.startsWith("PRZYPISZ_TRASE_Z_UWAGAMI")) {
+                    String[] parts = command.split(";", 4);
+                    out.println(przypiszTraseZUwagami(parts[1], parts[2], parts[3]));
+                }else if (command.startsWith("SPRAWDZ_DOSTEPNOSC_KIEROWCY")) {
+                    out.println(sprawdzDostepnoscKierowcy(command.split(";")[1]));
+                }else if (command.startsWith("POBIERZ_POJAZDY_Z_ZLECENIAMI")) {
+                    out.println(pobierzPojazdyZZleceniami());
+                }else if (command.startsWith("POBIERZ_POJAZDY_Z_KIEROWCAMI")) {
+                    out.println(pobierzPojazdyZKierowcami());
+
+                } else if (command.startsWith("POBIERZ_KIEROWCOW_Z_ID")) {
+                    out.println(pobierzKierowcowZId());
+
+                } else if (command.startsWith("PRZYPISZ_KIEROWCE_DO_POJAZDU")) {
+                    String[] parts = command.split(";", 3);
+                    out.println(przypiszKierowceDoPojazdu(parts[1], parts[2]));
+
+                } else if (command.startsWith("USUN_KIEROWCE_Z_POJAZDU")) {
+                    out.println(usunKierowceZPojazdu(command.split(";")[1]));
                 }else {
                     out.println("ERROR;Nieznana komenda");
                 }
@@ -722,16 +741,104 @@ public class server {
             return "ERROR;" + e.getMessage();
         }
     }
-
-    private static String przypiszTrase(String idZlecenia, String idPojazdu) {
+    private static String przypiszTraseZUwagami(String kierowca, String zleceniaIds, String uwagi) {
         try (Connection conn = getConnection()) {
-            PreparedStatement stmt = conn.prepareStatement(
-                    "UPDATE ZLECENIA SET pojazd_id = ?, status = 'Przypisane' WHERE id_zlecenia = ?"
+            // Znajdź ID kierowcy
+            PreparedStatement findKierowca = conn.prepareStatement(
+                    "SELECT id FROM UZYTKOWNIK WHERE (imie || ' ' || nazwisko) = ? AND rola = 'KURIER'"
             );
-            stmt.setInt(1, Integer.parseInt(idPojazdu));
-            stmt.setInt(2, Integer.parseInt(idZlecenia));
-            int rows = stmt.executeUpdate();
-            return rows > 0 ? "OK;Trasa została przypisana" : "ERROR;Nie znaleziono zlecenia";
+            findKierowca.setString(1, kierowca);
+            ResultSet rs = findKierowca.executeQuery();
+
+            if (!rs.next()) {
+                return "ERROR;Nie znaleziono kierowcy: " + kierowca;
+            }
+
+            int kierowcaId = rs.getInt("id");
+
+            // POPRAWKA: Poprawne parsowanie IDs zleceń
+            String[] ids = zleceniaIds.split(",");
+            int updatedCount = 0;
+
+            // Przypisz kierowcę do wszystkich zleceń
+            PreparedStatement stmt = conn.prepareStatement(
+                    "UPDATE ZLECENIA SET kierowca_id = ?, status = 'Przypisane' WHERE id_zlecenia = ?"
+            );
+
+            for (String id : ids) {
+                try {
+                    int idZlecenia = Integer.parseInt(id.trim());
+                    stmt.setInt(1, kierowcaId);
+                    stmt.setInt(2, idZlecenia);
+                    updatedCount += stmt.executeUpdate();
+                } catch (NumberFormatException e) {
+                    System.out.println("Błąd parsowania ID zlecenia: " + id);
+                    // Kontynuuj z następnym ID
+                }
+            }
+
+            if (updatedCount > 0) {
+                // Utwórz wpis w tabeli tras z uwagami
+                PreparedStatement trasaStmt = conn.prepareStatement(
+                        "INSERT INTO TRASY (kierowca_id, data_utworzenia, status, uwagi) VALUES (?, SYSDATE, 'Przypisana', ?)"
+                );
+                trasaStmt.setInt(1, kierowcaId);
+                trasaStmt.setString(2, uwagi.isEmpty() ? "Trasa z " + updatedCount + " zleceniami" : uwagi);
+                trasaStmt.executeUpdate();
+
+                return "OK;Trasa została przypisana kierowcy " + kierowca + " (" + updatedCount + " zleceń)";
+            } else {
+                return "ERROR;Nie udało się przypisać żadnego zlecenia";
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+            return "ERROR;" + e.getMessage();
+        }
+    }
+
+    private static String przypiszTrase(String kierowca, String zleceniaIds) {
+        try (Connection conn = getConnection()) {
+            // Znajdź ID kierowcy
+            PreparedStatement findKierowca = conn.prepareStatement(
+                    "SELECT id FROM UZYTKOWNIK WHERE (imie || ' ' || nazwisko) = ? AND rola = 'KURIER'"
+            );
+            findKierowca.setString(1, kierowca);
+            ResultSet rs = findKierowca.executeQuery();
+
+            if (!rs.next()) {
+                return "ERROR;Nie znaleziono kierowcy: " + kierowca;
+            }
+
+            int kierowcaId = rs.getInt("id");
+
+            // Podziel IDs zleceń
+            String[] ids = zleceniaIds.split(",");
+            int updatedCount = 0;
+
+            // Przypisz kierowcę do wszystkich zleceń
+            PreparedStatement stmt = conn.prepareStatement(
+                    "UPDATE ZLECENIA SET kierowca_id = ?, status = 'Przypisane' WHERE id_zlecenia = ?"
+            );
+
+            for (String id : ids) {
+                stmt.setInt(1, kierowcaId);
+                stmt.setInt(2, Integer.parseInt(id.trim()));
+                updatedCount += stmt.executeUpdate();
+            }
+
+            if (updatedCount > 0) {
+                // Opcjonalnie: utwórz wpis w tabeli tras
+                PreparedStatement trasaStmt = conn.prepareStatement(
+                        "INSERT INTO TRASY (kierowca_id, data_utworzenia, status, uwagi) VALUES (?, SYSDATE, 'Przypisana', ?)"
+                );
+                trasaStmt.setInt(1, kierowcaId);
+                trasaStmt.setString(2, "Trasa z " + ids.length + " zleceniami");
+                trasaStmt.executeUpdate();
+
+                return "OK;Trasa została przypisana kierowcy " + kierowca + " (" + updatedCount + " zleceń)";
+            } else {
+                return "ERROR;Nie udało się przypisać żadnego zlecenia";
+            }
         } catch (Exception e) {
             return "ERROR;" + e.getMessage();
         }
@@ -1041,7 +1148,7 @@ public class server {
     private static String pobierzDostepnePojazdy() {
         try (Connection conn = getConnection()) {
             PreparedStatement stmt = conn.prepareStatement(
-                    "SELECT id, marka, model, rejestracja FROM POJAZDY WHERE status = 'Dostępny'"
+                    "SELECT id, marka, model, rejestracja FROM POJAZDY WHERE status = 'Dostepny'"
             );
             ResultSet rs = stmt.executeQuery();
             StringBuilder sb = new StringBuilder("OK");
@@ -1051,7 +1158,7 @@ public class server {
                         .append(rs.getString("model")).append("|")
                         .append(rs.getString("rejestracja"));
             }
-            return sb.length() == 2 ? "ERROR;Brak dostępnych pojazdów" : sb.toString();
+            return sb.length() == 2 ? "ERROR;Brak dostepnych pojazdow" : sb.toString();
         } catch (Exception e) {
             return "ERROR;" + e.getMessage();
         }
@@ -1077,12 +1184,12 @@ public class server {
     private static String pobierzKierowcow() {
         try (Connection conn = getConnection()) {
             PreparedStatement stmt = conn.prepareStatement(
-                    "SELECT imie || ' ' || nazwisko as kierowca FROM UZYTKOWNIK WHERE rola = 'KURIER'"
+                    "SELECT imie || ' ' || nazwisko as nazwa FROM UZYTKOWNIK WHERE rola = 'KURIER' ORDER BY imie, nazwisko"
             );
             ResultSet rs = stmt.executeQuery();
             StringBuilder sb = new StringBuilder("OK");
             while (rs.next()) {
-                sb.append(";").append(rs.getString("kierowca"));
+                sb.append(";").append(rs.getString("nazwa"));
             }
             return sb.length() == 2 ? "ERROR;Brak kierowców" : sb.toString();
         } catch (Exception e) {
@@ -1117,7 +1224,7 @@ public class server {
         try (Connection conn = getConnection()) {
             PreparedStatement stmt = conn.prepareStatement(
                     "SELECT id_zlecenia, odbiorca, miasto, adres, waga FROM ZLECENIA " +
-                            "WHERE status = 'Gotowe do wysyłki' AND pojazd_id IS NOT NULL"
+                            "WHERE status IN ('Gotowe do wysyłki', 'Przyjęte') AND kierowca_id IS NULL"
             );
             ResultSet rs = stmt.executeQuery();
             StringBuilder sb = new StringBuilder("OK");
@@ -1136,39 +1243,85 @@ public class server {
 
     private static String przypiszPojazdDoZlecenia(String idZlecenia, String idPojazdu) {
         try (Connection conn = getConnection()) {
-            // Sprawdź czy pojazd jest dostępny
+            // Sprawdź czy pojazd istnieje (ale nie sprawdzaj statusu)
             PreparedStatement checkStmt = conn.prepareStatement(
-                    "SELECT status FROM POJAZDY WHERE id = ?"
+                    "SELECT id FROM POJAZDY WHERE id = ?"
             );
             checkStmt.setInt(1, Integer.parseInt(idPojazdu));
             ResultSet checkRs = checkStmt.executeQuery();
 
-            if (!checkRs.next() || !"Dostępny".equals(checkRs.getString("status"))) {
-                return "ERROR;Pojazd nie jest dostępny";
+            if (!checkRs.next()) {
+                return "ERROR;Nie znaleziono pojazdu";
             }
 
-            // Przypisz pojazd
+            // Sprawdź ile zleceń ma już ten pojazd
+            PreparedStatement countStmt = conn.prepareStatement(
+                    "SELECT COUNT(*) as liczba FROM ZLECENIA WHERE pojazd_id = ? AND status IN ('Przypisane', 'W drodze')"
+            );
+            countStmt.setInt(1, Integer.parseInt(idPojazdu));
+            ResultSet countRs = countStmt.executeQuery();
+
+            int aktualneZlecenia = 0;
+            if (countRs.next()) {
+                aktualneZlecenia = countRs.getInt("liczba");
+            }
+
+            // Przypisz pojazd do zlecenia
             PreparedStatement stmt = conn.prepareStatement(
-                    "UPDATE ZLECENIA SET pojazd_id = ? WHERE id_zlecenia = ?"
+                    "UPDATE ZLECENIA SET pojazd_id = ?, status = 'Przypisane' WHERE id_zlecenia = ?"
             );
             stmt.setInt(1, Integer.parseInt(idPojazdu));
             stmt.setInt(2, Integer.parseInt(idZlecenia));
 
-            // Zmień status pojazdu na zajęty
-            PreparedStatement updateStmt = conn.prepareStatement(
-                    "UPDATE POJAZDY SET status = 'Zajęty' WHERE id = ?"
-            );
-            updateStmt.setInt(1, Integer.parseInt(idPojazdu));
-
             int rows = stmt.executeUpdate();
-            updateStmt.executeUpdate();
 
-            return rows > 0 ? "OK;Pojazd został przypisany" : "ERROR;Nie znaleziono zlecenia";
+            if (rows > 0) {
+                // Zmień status pojazdu na zajęty (jeśli to pierwsze zlecenie)
+                if (aktualneZlecenia == 0) {
+                    PreparedStatement updateStmt = conn.prepareStatement(
+                            "UPDATE POJAZDY SET status = 'Zajety' WHERE id = ?"
+                    );
+                    updateStmt.setInt(1, Integer.parseInt(idPojazdu));
+                    updateStmt.executeUpdate();
+                }
+
+                return "OK;Pojazd zostal przypisany do zlecenia (łącznie " + (aktualneZlecenia + 1) + " zleceń)";
+            } else {
+                return "ERROR;Nie znaleziono zlecenia";
+            }
+
         } catch (Exception e) {
             return "ERROR;" + e.getMessage();
         }
     }
-
+    private static String pobierzPojazdyZZleceniami() {
+        try (Connection conn = getConnection()) {
+            PreparedStatement stmt = conn.prepareStatement(
+                    "SELECT p.id, p.marka, p.model, p.rejestracja, p.status, " +
+                            "COALESCE(z.liczba_zlecen, 0) as liczba_zlecen " +
+                            "FROM POJAZDY p " +
+                            "LEFT JOIN (SELECT pojazd_id, COUNT(*) as liczba_zlecen " +
+                            "           FROM ZLECENIA " +
+                            "           WHERE status IN ('Przypisane', 'W drodze') " +
+                            "           GROUP BY pojazd_id) z ON p.id = z.pojazd_id " +
+                            "WHERE p.status != 'W_naprawie' " +
+                            "ORDER BY p.marka, p.model"
+            );
+            ResultSet rs = stmt.executeQuery();
+            StringBuilder sb = new StringBuilder("OK");
+            while (rs.next()) {
+                sb.append(";").append(rs.getInt("id")).append("|")
+                        .append(rs.getString("marka")).append("|")
+                        .append(rs.getString("model")).append("|")
+                        .append(rs.getString("rejestracja")).append("|")
+                        .append(rs.getString("status")).append("|")
+                        .append(rs.getInt("liczba_zlecen"));
+            }
+            return sb.length() == 2 ? "ERROR;Brak pojazdow" : sb.toString();
+        } catch (Exception e) {
+            return "ERROR;" + e.getMessage();
+        }
+    }
     private static String pobierzHarmonogram(String filter) {
         try (Connection conn = getConnection()) {
             String sql = "SELECT z.id_zlecenia, z.data_nadania, u.imie || ' ' || u.nazwisko as nadawca, " +
@@ -1213,7 +1366,26 @@ public class server {
     private static String aktualizujStatusZlecenia(String idZlecenia, String nowyStatus) {
         return zmienStatus(idZlecenia, nowyStatus);
     }
+    private static String sprawdzDostepnoscKierowcy(String kierowca) {
+        try (Connection conn = getConnection()) {
+            PreparedStatement stmt = conn.prepareStatement(
+                    "SELECT COUNT(*) as liczba FROM ZLECENIA z " +
+                            "JOIN UZYTKOWNIK u ON z.kierowca_id = u.id " +
+                            "WHERE (u.imie || ' ' || u.nazwisko) = ? " +
+                            "AND z.status IN ('Przypisane', 'W drodze')"
+            );
+            stmt.setString(1, kierowca);
+            ResultSet rs = stmt.executeQuery();
 
+            if (rs.next()) {
+                int aktywneZlecenia = rs.getInt("liczba");
+                return "OK;" + aktywneZlecenia;
+            }
+            return "OK;0";
+        } catch (Exception e) {
+            return "ERROR;" + e.getMessage();
+        }
+    }
     private static String pobierzWszystkieZleceniaLogistyk() {
         try (Connection conn = getConnection()) {
             PreparedStatement stmt = conn.prepareStatement(
@@ -1347,7 +1519,97 @@ public class server {
             return "ERROR;" + e.getMessage();
         }
     }
+    private static String pobierzPojazdyZKierowcami() {
+        try (Connection conn = getConnection()) {
+            PreparedStatement stmt = conn.prepareStatement(
+                    "SELECT p.id, p.marka, p.model, p.rejestracja, p.status, " +
+                            "COALESCE(u.imie || ' ' || u.nazwisko, 'Brak przypisania') as kierowca " +
+                            "FROM POJAZDY p " +
+                            "LEFT JOIN UZYTKOWNIK u ON p.kierowca_id = u.id AND u.rola = 'KURIER' " +
+                            "ORDER BY p.marka, p.model"
+            );
+            ResultSet rs = stmt.executeQuery();
+            StringBuilder sb = new StringBuilder("OK");
+            while (rs.next()) {
+                sb.append(";").append(rs.getInt("id")).append("|")
+                        .append(rs.getString("marka")).append("|")
+                        .append(rs.getString("model")).append("|")
+                        .append(rs.getString("rejestracja")).append("|")
+                        .append(rs.getString("status")).append("|")
+                        .append(rs.getString("kierowca"));
+            }
+            return sb.length() == 2 ? "ERROR;Brak pojazdów" : sb.toString();
+        } catch (Exception e) {
+            return "ERROR;" + e.getMessage();
+        }
+    }
 
+    private static String przypiszKierowceDoPojazdu(String pojazdId, String kierowcaId) {
+        try (Connection conn = getConnection()) {
+            // Sprawdź czy kierowca nie ma już przypisanego pojazdu
+            PreparedStatement checkStmt = conn.prepareStatement(
+                    "SELECT COUNT(*) as liczba FROM POJAZDY WHERE kierowca_id = ?"
+            );
+            checkStmt.setInt(1, Integer.parseInt(kierowcaId));
+            ResultSet checkRs = checkStmt.executeQuery();
+
+            if (checkRs.next() && checkRs.getInt("liczba") > 0) {
+                return "ERROR;Ten kierowca ma już przypisany pojazd";
+            }
+
+            // Przypisz kierowcę do pojazdu
+            PreparedStatement stmt = conn.prepareStatement(
+                    "UPDATE POJAZDY SET kierowca_id = ? WHERE id = ?"
+            );
+            stmt.setInt(1, Integer.parseInt(kierowcaId));
+            stmt.setInt(2, Integer.parseInt(pojazdId));
+
+            int rows = stmt.executeUpdate();
+            return rows > 0 ? "OK;Kierowca został przypisany do pojazdu" : "ERROR;Nie znaleziono pojazdu";
+        } catch (Exception e) {
+            e.printStackTrace();
+            return "ERROR;" + e.getMessage();
+        }
+    }
+    private static String usunKierowceZPojazdu(String pojazdId) {
+        try (Connection conn = getConnection()) {
+            PreparedStatement stmt = conn.prepareStatement(
+                    "UPDATE POJAZDY SET kierowca_id = NULL WHERE id = ?"
+            );
+            stmt.setInt(1, Integer.parseInt(pojazdId));
+
+            int rows = stmt.executeUpdate();
+            return rows > 0 ? "OK;Przypisanie kierowcy zostało usunięte" : "ERROR;Nie znaleziono pojazdu";
+        } catch (Exception e) {
+            return "ERROR;" + e.getMessage();
+        }
+    }
+    private static String pobierzKierowcowZId() {
+        try (Connection conn = getConnection()) {
+            PreparedStatement stmt = conn.prepareStatement(
+                    "SELECT id, imie, nazwisko FROM UZYTKOWNIK WHERE rola = 'KURIER' ORDER BY imie, nazwisko"
+            );
+            ResultSet rs = stmt.executeQuery();
+            StringBuilder sb = new StringBuilder("OK");
+            int count = 0;
+            while (rs.next()) {
+                count++;
+                sb.append(";").append(rs.getInt("id")).append("|")
+                        .append(rs.getString("imie")).append(" ").append(rs.getString("nazwisko"));
+            }
+
+            System.out.println("DEBUG: Znaleziono " + count + " kierowców");
+
+            if (count == 0) {
+                return "ERROR;Brak kierowców w systemie";
+            }
+
+            return sb.toString();
+        } catch (Exception e) {
+            e.printStackTrace();
+            return "ERROR;" + e.getMessage();
+        }
+    }
     private static String usunIncydent(String idIncydentu) {
         try (Connection conn = getConnection()) {
             PreparedStatement stmt = conn.prepareStatement("DELETE FROM INCYDENTY WHERE id = ?");

@@ -37,7 +37,7 @@ public class LogistykForm extends JFrame {
         panel.add(createSectionLabel("🚛 Zarządzanie flotą"));
         panel.add(makeStyledButton("Zarządzaj pojazdami", e -> new ZarzadzajPojazdamiForm()));
         panel.add(makeStyledButton("Przypisz pojazd do zlecenia", e -> new PrzypisaniePojazduForm()));
-
+        panel.add(makeStyledButton("Przypisz kierowców do pojazdów", e -> new PrzypisanieKierowcowForm()));
         panel.add(Box.createRigidArea(new Dimension(0, 15)));
 
         // Sekcja planowania tras

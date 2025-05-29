@@ -122,6 +122,26 @@ public class PrzypisaniePojazduForm extends JFrame {
             pojazdyTable = new JTable(pojazdyModel);
             pojazdyTable.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
             pojazdyTable.getTableHeader().setReorderingAllowed(false);
+            pojazdyTable.setDefaultRenderer(Object.class, new javax.swing.table.DefaultTableCellRenderer() {
+                @Override
+                public Component getTableCellRendererComponent(JTable table, Object value,
+                                                               boolean isSelected, boolean hasFocus, int row, int column) {
+                    Component c = super.getTableCellRendererComponent(table, value, isSelected, hasFocus, row, column);
+
+                    if (!isSelected && table.getRowCount() > row) {
+                        String status = (String) table.getValueAt(row, 4);
+                        if (status.contains("W_naprawie")) {
+                            c.setBackground(new Color(255, 230, 230)); // Czerwony - w naprawie
+                        } else if (status.contains("(") && status.contains("zleceń)")) {
+                            c.setBackground(new Color(255, 248, 220)); // Żółty - ma zlecenia
+                        } else {
+                            c.setBackground(new Color(230, 255, 230)); // Zielony - dostępny
+                        }
+                    }
+
+                    return c;
+                }
+            });
             panel.add(new JScrollPane(pojazdyTable), BorderLayout.CENTER);
         }
 
@@ -173,29 +193,50 @@ public class PrzypisaniePojazduForm extends JFrame {
             out.println("POBIERZ_POJAZDY");
             String response = in.readLine();
 
+            System.out.println("Odpowiedź serwera: " + response); // DEBUG
+
             pojazdyModel.setRowCount(0);
 
             if (response.startsWith("OK")) {
                 String[] entries = response.split(";");
+                System.out.println("Liczba wpisów: " + (entries.length - 1)); // DEBUG
+
                 for (int i = 1; i < entries.length; i++) {
-                    String[] fields = entries[i].split("\\|");
-                    pojazdyModel.addRow(new Object[]{
-                            Integer.parseInt(fields[0]), // ID
-                            fields[1],  // Marka
-                            fields[2],  // Model
-                            fields[3],  // Rejestracja
-                            fields[4]   // Status
-                    });
+                    String entry = entries[i];
+                    System.out.println("Wpis " + i + ": " + entry); // DEBUG
+
+                    String[] fields = entry.split("\\|");
+                    System.out.println("Liczba pól: " + fields.length); // DEBUG
+
+                    if (fields.length >= 5) {
+                        try {
+                            System.out.println("Próba parsowania ID: '" + fields[0] + "'"); // DEBUG
+                            int id = Integer.parseInt(fields[0].trim());
+
+                            pojazdyModel.addRow(new Object[]{
+                                    id,
+                                    fields[1],
+                                    fields[2],
+                                    fields[3],
+                                    fields[4]
+                            });
+
+                        } catch (NumberFormatException e) {
+                            System.out.println("BŁĄD parsowania: " + e.getMessage());
+                            System.out.println("Pole[0]: '" + fields[0] + "'");
+                            // Pomiń ten pojazd
+                        }
+                    }
                 }
             }
 
         } catch (Exception e) {
+            e.printStackTrace();
             JOptionPane.showMessageDialog(this,
                     "Błąd podczas wczytywania pojazdów: " + e.getMessage(),
                     "Błąd", JOptionPane.ERROR_MESSAGE);
         }
     }
-
     private void przypiszPojazd() {
         int selectedZlecenie = zleceniaTable.getSelectedRow();
         int selectedPojazd = pojazdyTable.getSelectedRow();
@@ -236,7 +277,8 @@ public class PrzypisaniePojazduForm extends JFrame {
              PrintWriter out = new PrintWriter(socket.getOutputStream(), true);
              BufferedReader in = new BufferedReader(new InputStreamReader(socket.getInputStream()))) {
 
-            out.println("PRZYPISZ_TRASE;" + idZlecenia + ";" + idPojazdu);
+            // POPRAWIONE: Użyj właściwej komendy do przypisania pojazdu (nie trasy!)
+            out.println("PRZYPISZ_POJAZD_DO_ZLECENIA;" + idZlecenia + ";" + idPojazdu);
             String response = in.readLine();
 
             if (response.startsWith("OK")) {
