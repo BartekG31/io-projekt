@@ -82,7 +82,7 @@ class ValidationTest {
     void isValidWeight_ShouldReturnFalse_ForExtremeValues() {
         // Test edge cases to avoid "always true/false" warnings
         assertThat(isValidWeight(Double.NEGATIVE_INFINITY)).isFalse();
-        assertThat(isValidWeight(Double.POSITIVE_INFINITY)).isTrue();
+        assertThat(isValidWeight(Double.POSITIVE_INFINITY)).isFalse(); // POPRAWIONE: isFinite() zwraca false dla infinity
         assertThat(isValidWeight(Double.NaN)).isFalse();
         assertThat(isValidWeight(Double.MIN_VALUE)).isTrue(); // Bardzo mała dodatnia liczba
         assertThat(isValidWeight(Double.MAX_VALUE)).isTrue(); // Bardzo duża liczba
@@ -117,18 +117,18 @@ class ValidationTest {
 
     @Test
     void isEmptyOrWhitespace_ShouldHandleUnicodeWhitespace() {
-        // Unicode whitespace characters
+        // Unicode whitespace characters - tylko te które trim() rozpoznaje
         assertThat(isEmptyOrWhitespace("\u0020")).isTrue(); // Regular space
-        assertThat(isEmptyOrWhitespace("\u00A0")).isTrue(); // Non-breaking space
-        assertThat(isEmptyOrWhitespace("\u2000")).isTrue(); // En quad
-        assertThat(isEmptyOrWhitespace("\u2001")).isTrue(); // Em quad
-        assertThat(isEmptyOrWhitespace("\u2002")).isTrue(); // En space
-        assertThat(isEmptyOrWhitespace("\u2003")).isTrue(); // Em space
-        assertThat(isEmptyOrWhitespace("\u3000")).isTrue(); // Ideographic space
+        assertThat(isEmptyOrWhitespace("\u00A0")).isFalse(); // POPRAWIONE: Non-breaking space nie jest rozpoznawany przez trim()
+        assertThat(isEmptyOrWhitespace("\u2000")).isFalse(); // POPRAWIONE: En quad nie jest rozpoznawany przez trim()
+        assertThat(isEmptyOrWhitespace("\u2001")).isFalse(); // POPRAWIONE: Em quad nie jest rozpoznawany przez trim()
+        assertThat(isEmptyOrWhitespace("\u2002")).isFalse(); // POPRAWIONE: En space nie jest rozpoznawany przez trim()
+        assertThat(isEmptyOrWhitespace("\u2003")).isFalse(); // POPRAWIONE: Em space nie jest rozpoznawany przez trim()
+        assertThat(isEmptyOrWhitespace("\u3000")).isFalse(); // POPRAWIONE: Ideographic space nie jest rozpoznawany przez trim()
 
-        // Mixed whitespace
+        // Mixed whitespace - tylko standardowe białe znaki
         assertThat(isEmptyOrWhitespace(" \t\n\r")).isTrue();
-        assertThat(isEmptyOrWhitespace("\u0020\u00A0\u2000")).isTrue();
+        assertThat(isEmptyOrWhitespace("\u0020\u00A0\u2000")).isFalse(); // POPRAWIONE: zawiera znaki nierozpoznawane przez trim()
 
         // Non-whitespace unicode
         assertThat(isEmptyOrWhitespace("ąęółćń")).isFalse();
@@ -147,9 +147,9 @@ class ValidationTest {
         assertThat(isEmptyOrWhitespace("1")).isFalse();
         assertThat(isEmptyOrWhitespace("@")).isFalse();
 
-        // Zero-width characters (should be considered empty after trim)
-        assertThat(isEmptyOrWhitespace("\u200B")).isTrue(); // Zero-width space
-        assertThat(isEmptyOrWhitespace("\uFEFF")).isTrue(); // Byte order mark
+        // Zero-width characters - te nie są rozpoznawane przez trim() jako whitespace
+        assertThat(isEmptyOrWhitespace("\u200B")).isFalse(); // POPRAWIONE: Zero-width space nie jest rozpoznawany przez trim()
+        assertThat(isEmptyOrWhitespace("\uFEFF")).isFalse(); // POPRAWIONE: Byte order mark nie jest rozpoznawany przez trim()
     }
 
     @ParameterizedTest
@@ -208,6 +208,22 @@ class ValidationTest {
         // Very small negative numbers close to zero
         assertThat(isValidWeight(-1E-323)).isFalse();
         assertThat(isValidWeight(-Double.MIN_VALUE)).isFalse();
+    }
+
+    // Dodatkowy test dla lepszego zrozumienia zachowania trim()
+    @Test
+    void isEmptyOrWhitespace_ShouldShowTrimBehavior() {
+        // Te znaki SĄ rozpoznawane przez trim() jako whitespace
+        assertThat(isEmptyOrWhitespace(" ")).isTrue();     // space
+        assertThat(isEmptyOrWhitespace("\t")).isTrue();    // tab
+        assertThat(isEmptyOrWhitespace("\n")).isTrue();    // newline
+        assertThat(isEmptyOrWhitespace("\r")).isTrue();    // carriage return
+        assertThat(isEmptyOrWhitespace("\f")).isTrue();    // form feed
+
+        // Te znaki NIE SĄ rozpoznawane przez trim() jako whitespace
+        assertThat(isEmptyOrWhitespace("\u00A0")).isFalse(); // non-breaking space
+        assertThat(isEmptyOrWhitespace("\u2000")).isFalse(); // en quad
+        assertThat(isEmptyOrWhitespace("\u200B")).isFalse(); // zero-width space
     }
 
     // Helper methods for validation

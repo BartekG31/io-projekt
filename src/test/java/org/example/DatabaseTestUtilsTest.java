@@ -17,18 +17,27 @@ class DatabaseTestUtilsTest {
 
     @BeforeEach
     void setUp() throws Exception {
-        // Połączenie z Oracle - zmień dane na swoje :DDDD
+        // Połączenie z Oracle - UŻYTKOWNIK TESTOWY!
         connection = DriverManager.getConnection(
                 "jdbc:oracle:thin:@localhost:1521:xe",
-                "system",
-                "iop123"
+                "c##testuser",  // Użytkownik testowy
+                "testpass123" // Hasło testowego użytkownika
         );
         connection.setAutoCommit(false); // Używamy transakcji
+
+        // Wyczyść bazę przed każdym testem
+        DatabaseTestUtils.cleanupTestDatabase(connection);
     }
 
     @AfterEach
     void tearDown() throws Exception {
         if (connection != null) {
+            // Wyczyść bazę po każdym teście
+            try {
+                DatabaseTestUtils.cleanupTestDatabase(connection);
+            } catch (Exception e) {
+                // Ignoruj błędy czyszczenia
+            }
             connection.rollback(); // Cofnij zmiany po teście
             connection.close();
         }
@@ -55,10 +64,20 @@ class DatabaseTestUtilsTest {
         rs2.next();
         assertThat(rs2.getInt(1)).isEqualTo(1);
 
+        // Sprawdź czy wszystkie tabele zostały utworzone
+        PreparedStatement stmt3 = connection.prepareStatement(
+                "SELECT COUNT(*) FROM USER_TABLES WHERE table_name IN ('UZYTKOWNIK', 'POJAZDY', 'ZLECENIA', 'INCYDENTY', 'RAPORTY_TRAS')"
+        );
+        ResultSet rs3 = stmt3.executeQuery();
+        rs3.next();
+        assertThat(rs3.getInt(1)).isEqualTo(5);
+
         rs.close();
         stmt.close();
         rs2.close();
         stmt2.close();
+        rs3.close();
+        stmt3.close();
     }
 
     @Test
@@ -106,6 +125,24 @@ class DatabaseTestUtilsTest {
         assertThat(rs.getString("nazwisko")).isEqualTo("Kowalski");
         assertThat(rs.getString("login")).isEqualTo("jkowalski");
         assertThat(rs.getString("rola")).isEqualTo("KLIENT");
+
+        rs.close();
+        stmt.close();
+    }
+
+    @Test
+    void setupTestDatabase_ShouldWorkMultipleTimes() throws Exception {
+        // Given & When - wywołaj setup dwa razy
+        DatabaseTestUtils.setupTestDatabase(connection);
+        DatabaseTestUtils.setupTestDatabase(connection); // Nie powinno rzucić błędu
+
+        // Then - tabele nadal powinny istnieć
+        PreparedStatement stmt = connection.prepareStatement(
+                "SELECT COUNT(*) FROM USER_TABLES WHERE table_name = 'UZYTKOWNIK'"
+        );
+        ResultSet rs = stmt.executeQuery();
+        rs.next();
+        assertThat(rs.getInt(1)).isEqualTo(1);
 
         rs.close();
         stmt.close();
