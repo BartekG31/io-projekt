@@ -1,8 +1,6 @@
 package org.example;
 
-/**
- * Centralne miejsce dla wszystkich zapytań SQL Oracle
- */
+
 public class DatabaseQueries {
 
     // === CREATE TABLE QUERIES ===

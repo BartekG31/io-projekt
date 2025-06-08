@@ -256,16 +256,16 @@ public class DatabaseTestHelper {
 
     // === SAMPLE DATA CREATION ===
     public static void createSampleData(Connection connection) throws SQLException {
-        // Dodaj przykładowych użytkowników
+        // Dodaje przykładowych użytkowników
         insertTestUser(connection, "Jan", "Kowalski", "jkowalski", "pass123", "KLIENT");
         insertTestUser(connection, "Anna", "Nowak", "anowak", "pass456", "KURIER");
         insertTestUser(connection, "Piotr", "Wiśniewski", "pwisniewski", "pass789", "LOGISTYK");
 
-        // Dodaj przykładowe pojazdy
+        // Dodaje przykładowe pojazdy
         insertTestPojazd(connection, "Mercedes", "Sprinter", "WA12345", "Dostepny", "Pojazd w dobrym stanie");
         insertTestPojazd(connection, "Ford", "Transit", "WA67890", "Zajety", "");
 
-        // Dodaj przykładowe zlecenia
+        // Dodaje przykładowe zlecenia
         insertSimpleZlecenie(connection, 1, "Test Odbiorca", "Nowe");
         insertTestZlecenie(connection, 1, "Jan Testowy", "ul. Testowa 1", "Warszawa",
                 "00-001", "Paczka testowa", 2.5, "Gotowe do wysyłki");

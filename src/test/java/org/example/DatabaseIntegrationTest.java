@@ -35,10 +35,10 @@ class DatabaseIntegrationTest {
 
     @Test
     void integration_Login_ShouldWorkWithRealDatabase() throws SQLException {
-        // When
+
         Uzytkownik result = uzytkownikDAO.zaloguj("jkowalski", "password123");
 
-        // Then
+
         assertThat(result).isNotNull();
         assertThat(result.getImie()).isEqualTo("Jan");
         assertThat(result.getNazwisko()).isEqualTo("Kowalski");
@@ -47,19 +47,19 @@ class DatabaseIntegrationTest {
 
     @Test
     void integration_Login_ShouldReturnNull_ForInvalidCredentials() throws SQLException {
-        // When
+
         Uzytkownik result = uzytkownikDAO.zaloguj("jkowalski", "wrongpassword");
 
-        // Then
+
         assertThat(result).isNull();
     }
 
     @Test
     void integration_Login_ShouldReturnNull_ForNonExistentUser() throws SQLException {
-        // When
+
         Uzytkownik result = uzytkownikDAO.zaloguj("nonexistent", "password");
 
-        // Then
+
         assertThat(result).isNull();
     }
 }
